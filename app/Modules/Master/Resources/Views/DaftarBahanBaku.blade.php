@@ -29,6 +29,8 @@
                                 <th>Stok</th>
                                 <th>Satuan</th>
                                 <th>Deskripsi</th>
+                                <th>Pembuat</th>
+                                <th>Pengubah</th>
                                 <th>Aksi</th>
                             </tr>
                         </thead>
@@ -61,13 +63,6 @@
                             <label for="nama">Nama</label>
                             <input type="text" name="nama" id="nama" class="form-control" required>
                         </div>
-
-                        <div class="form-group">
-                            <label for="stok">Stok</label>
-                            <input type="number" name="stok_bahan_baku" id="stok" class="form-control" value="0"
-                                required>
-                        </div>
-
                         <div class="form-group">
                             <label for="satuan">Satuan</label>
                             <input type="text" name="satuan" id="satuan" class="form-control" required>
@@ -113,12 +108,6 @@
                             <label for="edit_nama">Nama</label>
                             <input type="text" name="nama" id="edit_nama" class="form-control" required>
                         </div>
-
-                        <div class="form-group">
-                            <label for="edit_stok">Stok</label>
-                            <input type="number" name="stok_bahan_baku" id="edit_stok" class="form-control" required>
-                        </div>
-
                         <div class="form-group">
                             <label for="edit_satuan">Satuan</label>
                             <input type="text" name="satuan" id="edit_satuan" class="form-control" required>
@@ -181,6 +170,12 @@
                     },
                     {
                         data: 'deskripsi'
+                    },
+                    {
+                        data: 'nama_pembuat'
+                    },
+                    {
+                        data: 'nama_pengubah'
                     },
                     {
                         data: null,
@@ -270,7 +265,6 @@
                 $('#edit_id').val(id);
                 $('#edit_id_hidden').val(id);
                 $('#edit_nama').val(btn.data('nama'));
-                $('#edit_stok').val(btn.data('stok'));
                 $('#edit_satuan').val(btn.data('satuan'));
                 $('#edit_deskripsi').val(btn.data('deskripsi'));
 

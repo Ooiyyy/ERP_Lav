@@ -34,7 +34,7 @@ class PembayaranController
         ];
 
         $snapToken = \Midtrans\Snap::getSnapToken($params);
-        
+
         return view('penjualan::pembayaran', ['snap_token' => $snapToken]);
     }
 
@@ -45,18 +45,19 @@ class PembayaranController
     public function createSnapToken(Request $request)
     {
         $v = Validator::make($request->all(), [
-            'order_id'     => 'required|exists:order,id',
+            'order_id' => 'required|exists:order,id',
             'jumlah_bayar' => 'required|numeric|min:100',
-        	'id_sales' => 'nullable|string',
+            'id_sales' => 'nullable|string',
         ]);
 
         if ($v->fails()) {
             return response()->json([
                 'success' => false,
-                'errors'  => $v->errors()->all()
+                'errors' => $v->errors()->all()
             ], 422);
         }
-    	$idSales = $request->filled('id_sales')? $request->id_sales: auth('web')->id();
+        $idSales = $request->filled('id_sales') ? $request->id_sales : auth('web')->id();
+        $hasSalesFromRequest = $request->filled('id_sales');
 
 
         $order = Order::with(['detailOrders.product', 'toko', 'sales'])
@@ -64,22 +65,23 @@ class PembayaranController
 
         $jumlahBayar = (int) round($request->jumlah_bayar);
 
-        $total = $order->detailOrders->sum(fn($d) => ((int)$d->jumlah * (int)$d->harga));
+        $total = $order->detailOrders->sum(fn($d) => ((int) $d->jumlah * (int) $d->harga));
 
         $paidCash = DB::table('pembayaran_cash')->where('id_order', $order->id)->sum('nominal');
-        $paidVa   = DB::table('pembayaran_va')->where('id_order', $order->id)->where('status','paid')->sum('nominal');
+        $paidVa = DB::table('pembayaran_va')->where('id_order', $order->id)->where('status', 'paid')->sum('nominal');
 
         $remaining = max(0, $total - ($paidCash + $paidVa));
         if ($remaining <= 0) {
-            return response()->json(['success'=>false,'message'=>'Order sudah lunas'],422);
+            return response()->json(['success' => false, 'message' => 'Order sudah lunas'], 422);
         }
 
-        if ($jumlahBayar > $remaining) $jumlahBayar = $remaining;
+        if ($jumlahBayar > $remaining)
+            $jumlahBayar = $remaining;
 
         \Midtrans\Config::$serverKey = config('services.midtrans.server_key');
         \Midtrans\Config::$isProduction = false;
-        \Midtrans\Config::$isSanitized  = true;
-        \Midtrans\Config::$is3ds        = true;
+        \Midtrans\Config::$isSanitized = true;
+        \Midtrans\Config::$is3ds = true;
 
         // 🔥 BUAT SEKALI SAJA
         $midtransOrderId = 'VA-' . $order->id . '-' . Str::uuid();
@@ -109,41 +111,48 @@ class PembayaranController
 
         $params = [
             'transaction_details' => [
-                'order_id'     => $midtransOrderId,
+                'order_id' => $midtransOrderId,
                 'gross_amount' => $jumlahBayar,
             ],
             'item_details' => $itemDetails,
             'customer_details' => [
                 'first_name' => $order->sales->nama ?? 'Sales',
-                'phone'      => $order->sales->no_hp ?? '',
+                'phone' => $order->sales->no_hp ?? '',
             ],
         ];
+        if ($hasSalesFromRequest) {
+            $params['callbacks'] = [
+                'finish' => 'https://smpsegodorejo.site/laravel/api/payment/finish',
+                'unfinish' => 'https://smpsegodorejo.site/laravel/api/payment/unfinish',
+                'error' => 'https://smpsegodorejo.site/laravel/api/payment/error',
+            ];
+        }
 
         try {
             $snap = \Midtrans\Snap::createTransaction($params);
 
             PembayaranVa::create([
-                'id'                => 'PV' . Str::upper(Str::random(10)),
-                'id_order'          => $order->id,
-                'nominal'           => $jumlahBayar,
-                'channel'           => null,
+                'id' => 'PV' . Str::upper(Str::random(10)),
+                'id_order' => $order->id,
+                'nominal' => $jumlahBayar,
+                'channel' => null,
                 'tanggal_transaksi' => Carbon::now(),
-                'payment_link'      => $snap->redirect_url,
-                'nomor_ref'         => $midtransOrderId, // 🔥 MATCH
-                'status'            => 'pending',
+                'payment_link' => $snap->redirect_url,
+                'nomor_ref' => $midtransOrderId, // 🔥 MATCH
+                'status' => 'pending',
                 //'id_buat'           => auth('web')->id(),
-            	'id_buat'           => $idSales,
-                'tanggal_buat'      => Carbon::now(),
+                'id_buat' => $idSales,
+                'tanggal_buat' => Carbon::now(),
             ]);
 
             return response()->json([
-                'success'    => true,
+                'success' => true,
                 'snap_token' => $snap->token,
             ]);
 
         } catch (\Throwable $e) {
-            \Log::error('MIDTRANS ERROR', ['msg'=>$e->getMessage()]);
-            return response()->json(['success'=>false,'message'=>'Gagal membuat Snap'],500);
+            \Log::error('MIDTRANS ERROR', ['msg' => $e->getMessage()]);
+            return response()->json(['success' => false, 'message' => 'Gagal membuat Snap'], 500);
         }
     }
 
@@ -154,74 +163,79 @@ class PembayaranController
      */
     public function data(Request $req)
     {
+        $draw = (int) $req->input('draw', 1);
         $start = (int) $req->input('start', 0);
         $length = (int) $req->input('length', 10);
         $search = trim((string) $req->input('search.value', ''));
 
-        $baseQuery = Order::with(['detailOrders', 'sales', 'toko'])->orderBy('tanggal_buat', 'desc');
+        // =====================================================
+        // 1) Ambil semua order + relasi
+        // =====================================================
+        $orders = Order::with(['detailOrders', 'sales', 'toko'])
+            ->orderBy('tanggal_buat', 'desc')
+            ->get();
 
-        if ($search !== '') {
-            $baseQuery = $baseQuery->where(function ($w) use ($search) {
-                $w->where('id', 'like', "%{$search}%")
-                ->orWhere('id_toko', 'like', "%{$search}%")
-                ->orWhereHas('toko', function ($t) use ($search) {
-                    $t->where('nama', 'like', "%{$search}%")
-                        ->orWhere('nama_toko', 'like', "%{$search}%");
-                })
-                ->orWhereHas('sales', function ($s) use ($search) {
-                    $s->where('nama', 'like', "%{$search}%")
-                        ->orWhere('name', 'like', "%{$search}%")
-                        ->orWhere('id_karyawan', 'like', "%{$search}%");
-                });
-            });
+        if ($orders->isEmpty()) {
+            return response()->json([
+                'draw' => $draw,
+                'recordsTotal' => 0,
+                'recordsFiltered' => 0,
+                'data' => [],
+            ]);
         }
 
-        $totalRecords = $baseQuery->count();
-        $rows = $baseQuery->skip($start)->take($length)->get();
+        // =====================================================
+        // 2) Mapping + hitung total/paid/remaining
+        // =====================================================
+        $result = $orders->map(function ($order) {
 
-        $data = $rows->map(function ($order) {
-            $total = method_exists($order, 'totalAmount') ? $order->totalAmount() : (
+            $total = method_exists($order, 'totalAmount') ? (float) $order->totalAmount() : (
                 isset($order->total) && $order->total !== null ? (float) $order->total :
-                ($order->detailOrders->sum(function($d){ return ((float)($d->jumlah ?? 0) * (float)($d->harga ?? 0)); }) ?? 0)
+                (float) $order->detailOrders->sum(function ($d) {
+                    return ((float) ($d->jumlah ?? 0)) * ((float) ($d->harga ?? 0));
+                })
             );
 
-            $paidCash = Schema::hasTable('pembayaran_cash') ? (float) DB::table('pembayaran_cash')->where('id_order', $order->id)->sum('nominal') : 0;
-            $paidVa = DB::table('pembayaran_va')
-                ->where('id_order', $order->id)
-                ->where('status', 'paid')
-                ->sum('nominal');
+            $paidCash = Schema::hasTable('pembayaran_cash')
+                ? (float) DB::table('pembayaran_cash')->where('id_order', $order->id)->sum('nominal')
+                : 0;
+
+            $paidVa = Schema::hasTable('pembayaran_va')
+                ? (float) DB::table('pembayaran_va')
+                    ->where('id_order', $order->id)
+                    ->where('status', 'paid')
+                    ->sum('nominal')
+                : 0;
 
             $paid = $paidCash + $paidVa;
 
             $remaining = max(0, $total - $paid);
             $isLunas = ($total > 0 && $paid >= $total);
-            if ($isLunas) return null; // filter later
 
             $salesName = optional($order->sales)->nama
-                        ?? optional($order->sales)->name
-                        ?? optional($order->sales)->id_karyawan
-                        ?? $order->id_sales;
+                ?? optional($order->sales)->name
+                ?? optional($order->sales)->id_karyawan
+                ?? $order->id_sales;
 
             $tokoName = optional($order->toko)->nama_toko
-                    ?? optional($order->toko)->nama
-                    ?? $order->id_toko;
+                ?? optional($order->toko)->nama
+                ?? $order->id_toko;
 
-            // AMAN: ambil nomor hp dari relasi sales, fallback ke Karyawan model bila relasi null / kosong
             $salesPhone = optional($order->sales)->no_hp
-                        ?? optional($order->sales)->phone
-                        ?? null;
+                ?? optional($order->sales)->phone
+                ?? null;
 
             if (empty($salesPhone) && !empty($order->id_sales)) {
                 try {
-                    // jika id_sales menyimpan PK karyawan
                     $k = Karyawan::find($order->id_sales);
-                    if ($k) $salesPhone = $k->no_hp ?? $k->phone ?? $salesPhone;
+                    if ($k)
+                        $salesPhone = $k->no_hp ?? $k->phone ?? $salesPhone;
                 } catch (\Throwable $e) {
                     // ignore
                 }
             }
 
-            // buat payload untuk data-order tapi encode aman untuk HTML
+            // payload untuk tombol bayar/detail
             $payload = [
                 'id' => $order->id,
                 'kode' => $order->kode ?? $order->id,
@@ -230,11 +244,11 @@ class PembayaranController
                 'kurang' => $remaining,
                 'sales_phone' => $salesPhone,
             ];
-            // json encode tanpa escape unicode / slashes supaya lebih ringkas
+
             $payloadJson = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 
             $actions = '<button type="button" class="btn btn-sm btn-success btn-detail" data-id="' . e($order->id) . '" data-order=\'' . e($payloadJson) . '\'>Detail</button> '
-                    . '<button type="button" class="btn btn-sm btn-info btn-bayar" data-id="' . e($order->id) . '" data-order=\'' . e($payloadJson) . '\'>Bayar</button>';
+                . '<button type="button" class="btn btn-sm btn-info btn-bayar" data-id="' . e($order->id) . '" data-order=\'' . e($payloadJson) . '\'>Bayar</button>';
 
             return [
                 'id' => $order->id,
@@ -248,12 +262,43 @@ class PembayaranController
                 'is_lunas' => $isLunas ? 1 : 0,
                 'actions' => $actions,
             ];
-        })->filter()->values();
+        });
+
+        // =====================================================
+        // 3) Filter hanya yang BELUM LUNAS (halaman pembayaran)
+        // =====================================================
+        $result = $result->filter(fn($r) => (int) $r['is_lunas'] === 0)->values();
+
+        // Total data sebelum search (tapi sudah sesuai halaman: belum lunas)
+        $recordsTotal = $result->count();
+
+        // =====================================================
+        // 4) Search DataTables (mirip History & Pesanan fix)
+        // =====================================================
+        if ($search !== '') {
+            $s = mb_strtolower($search);
+
+            $result = $result->filter(function ($r) use ($s) {
+                foreach (['id', 'created_at', 'sales_name', 'sales_phone', 'toko_name', 'total', 'paid', 'remaining'] as $f) {
+                    if (mb_stripos((string) ($r[$f] ?? ''), $s) !== false) {
+                        return true;
+                    }
+                }
+                return false;
+            })->values();
+        }
+
+        $recordsFiltered = $result->count();
+
+        // =====================================================
+        // 5) Pagination
+        // =====================================================
+        $data = $result->slice($start, $length)->values();
 
         return response()->json([
-            'draw' => (int)$req->input('draw', 1),
-            'recordsTotal' => $totalRecords,
-            'recordsFiltered' => $data->count(),
+            'draw' => $draw,
+            'recordsTotal' => $recordsTotal,
+            'recordsFiltered' => $recordsFiltered,
             'data' => $data,
         ]);
     }
@@ -283,7 +328,7 @@ class PembayaranController
             $cash = DB::table('pembayaran_cash as pc')
                 ->leftJoin('karyawan as k', 'k.id', '=', 'pc.petugas_pembayaran')
                 ->where('pc.id_order', $id)
-                ->orderBy('pc.tanggal_pembayaran','asc')
+                ->orderBy('pc.tanggal_pembayaran', 'asc')
                 ->select(
                     'pc.id',
                     'pc.nominal',
@@ -291,7 +336,7 @@ class PembayaranController
                     'k.nama as nama_petugas'
                 )
                 ->get();
-        
+
             foreach ($cash as $c) {
                 $payments[] = [
                     'id' => $c->id,
@@ -302,9 +347,9 @@ class PembayaranController
                 ];
             }
         }
-        
+
         if (Schema::hasTable('pembayaran_va')) {
-            $va = DB::table('pembayaran_va')->where('id_order', $id)->orderBy('tanggal_transaksi','asc')->get();
+            $va = DB::table('pembayaran_va')->where('id_order', $id)->orderBy('tanggal_transaksi', 'asc')->get();
             foreach ($va as $v) {
                 $payments[] = [
                     'id' => $v->id,
@@ -320,13 +365,14 @@ class PembayaranController
             }
         }
 
-        usort($payments, function($a,$b){
+        usort($payments, function ($a, $b) {
             return strtotime($a['tanggal'] ?? '1970-01-01') <=> strtotime($b['tanggal'] ?? '1970-01-01');
         });
 
         $total = method_exists($order, 'totalAmount') ? $order->totalAmount() : (
             isset($order->total) && $order->total !== null ? (float) $order->total :
-            array_reduce($items, function($c,$it){ return $c + (($it['qty'] ?? 0) * ($it['harga'] ?? 0)); }, 0)
+            array_reduce($items, function ($c, $it) {
+                return $c + (($it['qty'] ?? 0) * ($it['harga'] ?? 0)); }, 0)
         );
 
         $paid = 0;
@@ -337,14 +383,16 @@ class PembayaranController
                 $paid += (float) $p['nominal'];
             }
         }
-        
+
 
         $salesPhone = optional($order->sales)->no_hp ?? optional($order->sales)->phone ?? null;
         if (empty($salesPhone) && !empty($order->id_sales)) {
             try {
                 $k = Karyawan::find($order->id_sales);
-                if ($k) $salesPhone = $k->no_hp ?? $k->phone ?? $salesPhone;
-            } catch (\Throwable $e) {}
+                if ($k)
+                    $salesPhone = $k->no_hp ?? $k->phone ?? $salesPhone;
+            } catch (\Throwable $e) {
+            }
         }
 
         $resp = [
@@ -364,7 +412,7 @@ class PembayaranController
 
         return response()->json(['success' => true, 'order' => $resp]);
     }
-    
+
 
     /**
      * Simpan pembayaran cash (AJAX)
@@ -375,7 +423,8 @@ class PembayaranController
             'order_id' => 'required|exists:order,id',
             'jumlah_bayar' => 'required|numeric|min:1',
         ]);
-        if ($v->fails()) return response()->json(['success' => false, 'errors' => $v->errors()->all()], 422);
+        if ($v->fails())
+            return response()->json(['success' => false, 'errors' => $v->errors()->all()], 422);
 
         $orderId = $req->input('order_id');
         $jumlah = (float) $req->input('jumlah_bayar');
@@ -386,16 +435,17 @@ class PembayaranController
 
             $total = method_exists($order, 'totalAmount') ? $order->totalAmount() : (
                 isset($order->total) && $order->total !== null ? (float) $order->total :
-                $order->detailOrders->sum(function($d){ return ((float)($d->jumlah ?? 0) * (float)($d->harga ?? 0)); })
+                $order->detailOrders->sum(function ($d) {
+                    return ((float) ($d->jumlah ?? 0) * (float) ($d->harga ?? 0)); })
             );
 
             $paidCash = Schema::hasTable('pembayaran_cash') ? (float) DB::table('pembayaran_cash')->where('id_order', $order->id)->sum('nominal') : 0;
-            $paidVa = Schema::hasTable('pembayaran_va') 
-            ? (float) DB::table('pembayaran_va')
-                ->where('id_order', $order->id)
-                ->where('status', 'paid')   // ⬅️ INI KUNCI
-                ->sum('nominal')
-            : 0;
+            $paidVa = Schema::hasTable('pembayaran_va')
+                ? (float) DB::table('pembayaran_va')
+                    ->where('id_order', $order->id)
+                    ->where('status', 'paid')   // ⬅️ INI KUNCI
+                    ->sum('nominal')
+                : 0;
 
             $paid = $paidCash + $paidVa;
 
@@ -446,7 +496,7 @@ class PembayaranController
                     'petugas' => $petugasNama ?? '-',
                     'tanggal' => (string) $pc->tanggal_pembayaran
                 ],
-                
+
                 'order' => [
                     'id' => $order->id,
                     'total' => $total,
@@ -461,7 +511,7 @@ class PembayaranController
         }
     }
 
-    
+
     /**
      * Simpan pembayaran VA (AJAX)
      */
@@ -474,7 +524,8 @@ class PembayaranController
             'payment_link' => 'nullable|string',
             'nomor_ref' => 'nullable|string',
         ]);
-        if ($v->fails()) return response()->json(['success' => false, 'errors' => $v->errors()->all()], 422);
+        if ($v->fails())
+            return response()->json(['success' => false, 'errors' => $v->errors()->all()], 422);
 
         $orderId = $req->input('order_id');
         $jumlah = (float) $req->input('jumlah_bayar');
@@ -488,16 +539,17 @@ class PembayaranController
 
             $total = method_exists($order, 'totalAmount') ? $order->totalAmount() : (
                 isset($order->total) && $order->total !== null ? (float) $order->total :
-                $order->detailOrders->sum(function($d){ return ((float)($d->jumlah ?? 0) * (float)($d->harga ?? 0)); })
+                $order->detailOrders->sum(function ($d) {
+                    return ((float) ($d->jumlah ?? 0) * (float) ($d->harga ?? 0)); })
             );
 
             $paidCash = Schema::hasTable('pembayaran_cash') ? (float) DB::table('pembayaran_cash')->where('id_order', $order->id)->sum('nominal') : 0;
-            $paidVa = Schema::hasTable('pembayaran_va') 
-            ? (float) DB::table('pembayaran_va')
-                ->where('id_order', $order->id)
-                ->where('status', 'paid')   // ⬅️ WAJIB
-                ->sum('nominal')
-            : 0;
+            $paidVa = Schema::hasTable('pembayaran_va')
+                ? (float) DB::table('pembayaran_va')
+                    ->where('id_order', $order->id)
+                    ->where('status', 'paid')   // ⬅️ WAJIB
+                    ->sum('nominal')
+                : 0;
 
             $paid = $paidCash + $paidVa;
 

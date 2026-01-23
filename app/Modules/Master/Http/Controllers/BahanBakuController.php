@@ -2,7 +2,6 @@
 
 namespace App\Modules\Master\Http\Controllers;
 
-use id;
 use App\Models\BahanBaku;
 use Illuminate\Support\Str;
 use Illuminate\Http\Request;
@@ -16,10 +15,22 @@ class BahanBakuController
         return view('master::DaftarBahanBaku'); // atau folder/filename sesuai struktur kamu
     }
 
-    // Data untuk DataTables
     public function data()
     {
-        $rows = BahanBaku::orderBy('id')->get();
+        $rows = BahanBaku::query()
+            ->leftJoin('karyawan as pembuat', 'pembuat.id', '=', 'bahan_baku.id_buat')
+            ->leftJoin('karyawan as pengubah', 'pengubah.id', '=', 'bahan_baku.id_update')
+            ->select([
+                'bahan_baku.id',
+                'bahan_baku.nama',
+                'bahan_baku.stok_bahan_baku',
+                'bahan_baku.satuan',
+                'bahan_baku.deskripsi',
+                'pembuat.nama as nama_pembuat',
+                'pengubah.nama as nama_pengubah',
+            ])
+            ->orderBy('bahan_baku.id')
+            ->get();
 
         $data = $rows->map(function ($r) {
             return [
@@ -28,12 +39,12 @@ class BahanBakuController
                 'stok_bahan_baku' => $r->stok_bahan_baku,
                 'satuan' => $r->satuan,
                 'deskripsi' => $r->deskripsi,
+                'nama_pembuat' => $r->nama_pembuat ?? '-',
+                'nama_pengubah' => $r->nama_pengubah ?? '-',
             ];
         });
 
-        return response()->json([
-            'data' => $data,
-        ]);
+        return response()->json(['data' => $data]);
     }
 
     // Simpan bahan baku baru
@@ -42,7 +53,6 @@ class BahanBakuController
         $v = Validator::make($request->all(), [
             'id' => 'required|string|max:50|unique:bahan_baku,id',
             'nama' => 'required|string|max:100',
-            'stok_bahan_baku' => 'required|integer',
             'satuan' => 'required|string|max:50',
             'deskripsi' => 'nullable|string',
         ]);
@@ -54,9 +64,10 @@ class BahanBakuController
         $data = new BahanBaku();
         $data->id = $request->id;
         $data->nama = $request->nama;
-        $data->stok_bahan_baku = (int) $request->stok_bahan_baku;
+        $data->stok_bahan_baku = 0;
         $data->satuan = $request->satuan;
         $data->deskripsi = $request->deskripsi;
+        $data->id_buat = auth('web')->id();
         $data->tanggal_buat = now();
         $data->tanggal_update = now();
         $data->save();
@@ -69,7 +80,6 @@ class BahanBakuController
     {
         $v = Validator::make($request->all(), [
             'nama' => 'required|string|max:100',
-            'stok_bahan_baku' => 'required|integer',
             'satuan' => 'required|string|max:50',
             'deskripsi' => 'nullable|string',
         ]);
@@ -84,9 +94,9 @@ class BahanBakuController
         }
 
         $item->nama = $request->nama;
-        $item->stok_bahan_baku = (int) $request->stok_bahan_baku;
         $item->satuan = $request->satuan;
         $item->deskripsi = $request->deskripsi;
+        $item->id_update = auth('web')->id();
         $item->tanggal_update = now();
         $item->save();
 

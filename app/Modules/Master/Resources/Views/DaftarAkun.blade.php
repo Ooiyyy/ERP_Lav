@@ -23,6 +23,8 @@
                                 <th>Password</th>
                                 <th>Status Login</th>
                                 <th>Status Akun</th>
+                                <th>Pembuat</th>
+                                <th>Pengubah</th>
                                 <th>Dibuat</th>
                                 <th>Aksi</th>
                             </tr>
@@ -53,7 +55,8 @@
                                 required>
                                 <option value="">-- Pilih Karyawan --</option>
                                 @foreach ($karyawanTanpaAkun as $j)
-                                    <option value="{{ $j->id }}" {{ old('id_karyawan') == $j->id ? 'selected' : '' }}>
+                                    <option value="{{ $j->id }}"
+                                        {{ old('id_karyawan') == $j->id ? 'selected' : '' }}>
                                         {{ $j->nama }}
                                     </option>
                                 @endforeach
@@ -131,7 +134,9 @@
     <script>
         $(function() {
             // endpoints (route or fallback)
-            const urlData = {!! \Illuminate\Support\Js::from(Route::has('master.dataAkun') ? route('master.dataAkun') : url('/master/dataakun')) !!};
+            const urlData = {!! \Illuminate\Support\Js::from(
+                Route::has('master.dataAkun') ? route('master.dataAkun') : url('/master/dataakun'),
+            ) !!};
             const urlStore = {!! \Illuminate\Support\Js::from(
                 Route::has('master.simpanAkun') ? route('master.simpanAkun') : url('/master/simpanakun'),
             ) !!};
@@ -218,6 +223,14 @@
                         <label class="custom-control-label" for="sw-${id}">${esc(status)}</label>
                     </div>`;
                         }
+                    },
+                    {
+                        data: 'nama_pembuat',
+                        defaultContent: '-'
+                    },
+                    {
+                        data: 'nama_pengubah',
+                        defaultContent: '-'
                     },
                     {
                         data: 'tanggal_buat',

@@ -6,6 +6,7 @@ use App\Modules\Gudang\Http\Controllers\BahanBakuMasukController;
 use App\Modules\Gudang\Http\Controllers\BahanBakuKeluarController;
 use App\Modules\Gudang\Http\Controllers\LaporanGudangController;
 use App\Modules\Gudang\Http\Controllers\ProdukMasukController;
+use App\Modules\Gudang\Http\Controllers\LaporanProdukController;
 
 Route::middleware(['web', 'auth:web', 'role:001,002'])
     ->prefix('gudang')
@@ -112,4 +113,28 @@ Route::middleware(['web', 'auth:web', 'role:001,002'])
         'bahan-baku-keluar/detail/{id}',
         [BahanBakuKeluarController::class, 'detail']
     )->name('bahan-keluar.detail');
+// EXPORT PDF
+Route::get(
+    'gudang/laporan-harian/pdf',
+    [LaporanGudangController::class, 'exportPdf']
+)->name('laporan-harian.pdf');
+Route::get(
+    'laporan-produk',
+    [LaporanProdukController::class, 'index']
+)->name('laporan-produk');
+
+Route::get(
+    'laporan-produk/pdf',
+    [LaporanProdukController::class, 'exportPdf']
+)->name('laporan-produk.pdf');
+
+
+    // Laporan Gudang (Masuk & Keluar)
+    Route::get('/laporan-harian', [LaporanGudangController::class, 'index'])
+        ->name('laporan-harian');
+
+    // Stok Bahan Baku
+    Route::get('/stok-bahan-baku', [BahanBakuController::class, 'stok'])
+        ->name('stok-bahan-baku');
+
     });

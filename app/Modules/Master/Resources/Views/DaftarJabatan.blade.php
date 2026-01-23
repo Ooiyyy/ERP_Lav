@@ -20,6 +20,8 @@
                             <th>No</th>
                             <th>ID</th>
                             <th>Nama Jabatan</th>
+                            <th>Pembuat</th>
+                            <th>Pengubah</th>
                             <th>Dibuat</th>
                             <th>Aksi</th>
                         </tr>
@@ -120,6 +122,8 @@ $(function(){
             { data: null, render: (d,t,r,m) => m.row + 1, width: '50px' },
             { data: 'id', width: '100px' },
             { data: 'nama' },
+            { data: 'nama_pembuat' },
+            { data: 'nama_pengubah' },
             { data: 'tanggal_buat', width: '160px' },
             {
                 data: null,

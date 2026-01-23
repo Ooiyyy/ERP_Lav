@@ -160,7 +160,7 @@ let table;
 
 $(document).ready(function () {
     table = $('#tableBahanMasuk').DataTable({
-        processing: true,
+        processing: false,
         serverSide: false,
         ajax: {
             url: "{{ route('gudang.bahan-masuk.data') }}",
@@ -179,12 +179,14 @@ $(document).ready(function () {
             }
         ],
         language: {
-            search: "Cari:",
-            lengthMenu: "Tampilkan _MENU_ data",
-            info: "Menampilkan _START_ - _END_ dari _TOTAL_ data",
+            search: "Search:",
+            lengthMenu: "Show _MENU_ entries",
+            info: "Showing _START_ to _END_ of _TOTAL_ entries",
+            infoEmpty: "Showing 0 to 0 of 0 entries",
+            zeroRecords: "No matching records found",
             paginate: {
-                previous: "Sebelumnya",
-                next: "Berikutnya"
+                previous: "Previous",
+                next: "Next"
             }
         }
     });

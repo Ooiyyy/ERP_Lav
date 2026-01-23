@@ -29,6 +29,8 @@
                                 <th>Nama Pelanggan</th>
                                 <th>No HP</th>
                                 <th>Alamat</th>
+                                <th>Pembuat</th>
+                                <th>Pengubah</th>
                                 <th>Aksi</th>
                             </tr>
                         </thead>
@@ -200,6 +202,12 @@
                     },
                     {
                         data: 'alamat'
+                    },
+                    {
+                        data: 'nama_pembuat'
+                    },
+                    {
+                        data: 'nama_pengubah'
                     },
                     {
                         data: null,
@@ -397,7 +405,8 @@
 
                     // kalau user klik "Ya, hapus" → eksekusi AJAX delete
                     $.ajax({
-                        url: "{{ route('master.hapusPelanggan', ':id') }}".replace(':id', id),
+                        url: "{{ route('master.hapusPelanggan', ':id') }}".replace(':id',
+                            id),
                         type: 'POST',
                         data: {
                             _token: '{{ csrf_token() }}',

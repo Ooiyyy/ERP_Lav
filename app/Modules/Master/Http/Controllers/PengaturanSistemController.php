@@ -25,40 +25,49 @@ class PengaturanSistemController
         return view('master::PengaturanSistem', compact('Toko'));
     }
 
-    public function dt() {
-        $konfigurasi = PengaturanSistem::all();
+    public function dt()
+    {
+        $rows = PengaturanSistem::query()
+            ->leftJoin('karyawan as pembuat', 'pembuat.id', '=', 'pengaturan_sistem.id_buat')
+            ->leftJoin('karyawan as pengubah', 'pengubah.id', '=', 'pengaturan_sistem.id_update')
+            ->select([
+                'pengaturan_sistem.id',
+                'pengaturan_sistem.ketentuan',
+                'pengaturan_sistem.keterangan',
+                'pembuat.nama as nama_pembuat',
+                'pengubah.nama as nama_pengubah',
+            ])
+            ->get();
 
-        $data = $konfigurasi->map(function ($t) {
+        $data = $rows->map(function ($t) {
             return [
-                'id'             => $t->id,
-                'ketentuan'      => $t->ketentuan,
-                'keterangan'         => $t->keterangan,
+                'id' => $t->id,
+                'ketentuan' => $t->ketentuan,
+                'keterangan' => $t->keterangan,
+                'nama_pembuat' => $t->nama_pembuat ?? '-',
+                'nama_pengubah' => $t->nama_pengubah ?? '-',
             ];
         });
-    
-        return response()->json(
-            [
-            'data' => $data
-            ], 200
-        );
+
+        return response()->json(['data' => $data], 200);
     }
 
     public function simpanPengaturanSistem(Request $request)
     {
         $validated = $request->validate([
-            'id'            => 'required',
-            'ketentuan'          => 'required|max:100',
-            'keterangan'        => 'required',
+            'id' => 'required',
+            'ketentuan' => 'required|max:100',
+            'keterangan' => 'required',
         ]);
 
         $idKonfigurasi = $validated['id'];
 
         $Konfigurasi = PengaturanSistem::create([
-            'id'            => $idKonfigurasi,
-            'ketentuan'          => $validated['ketentuan'],
-            'keterangan'        => $validated['keterangan'],
-            'id_buat'       => auth('web')->id(),
-            'tanggal_buat'  =>now(),
+            'id' => $idKonfigurasi,
+            'ketentuan' => $validated['ketentuan'],
+            'keterangan' => $validated['keterangan'],
+            'id_buat' => auth('web')->id(),
+            'tanggal_buat' => now(),
         ]);
 
         if ($request->ajax()) {
@@ -73,15 +82,15 @@ class PengaturanSistemController
         $Konfigurasi = PengaturanSistem::findOrFail($id);
 
         $request->validate([
-            'ketentuan'          => 'required|max:100',
-            'keterangan'        => 'required',
+            'ketentuan' => 'required|max:100',
+            'keterangan' => 'required',
         ]);
 
         $Konfigurasi->update([
 
-            'ketentuan'     =>$request->ketentuan,     
-            'keterangan'        =>$request->keterangan,   
-            'id_update'     => auth('web')->id(),
+            'ketentuan' => $request->ketentuan,
+            'keterangan' => $request->keterangan,
+            'id_update' => auth('web')->id(),
             'tanggal_update' => now(),
         ]);
 
@@ -96,7 +105,7 @@ class PengaturanSistemController
     {
         $Konfigurasi = PengaturanSistem::find($id);
 
-        if (! $Konfigurasi) {
+        if (!$Konfigurasi) {
             if ($request->ajax()) {
                 return response()->json(['status' => 'error', 'message' => 'Data PengaturanSistem tidak ditemukan.'], 404);
             }

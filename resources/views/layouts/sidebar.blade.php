@@ -9,7 +9,7 @@
     <div class="sidebar-brand-icon rotate-n-15">
         <i class="fas fa-laugh-wink"></i>
     </div>
-    <div class="sidebar-brand-text mx-3">Admin Sakati</div>
+    <div class="sidebar-brand-text mx-3">Admin SIKS</div>
 </a>
 
 @if ($isAdmin)
@@ -27,36 +27,31 @@
 <!-- Nav Item - Akun Collapse Menu -->
 @php
     $isMasterData = request()->is([
-        'master/bahan-baku',
-        'master/pelanggan',
-        'master/toko',
-        'master/supplier',
-        'master/produk',
-        'master/akun',
+        'master/bahan-baku*',
+        'master/pelanggan*',
+        'master/toko*',
+        'master/supplier*',
+        'master/produk*',
+        'master/akun*',
         'master/karyawan*',
         'master/jabatan*',
         'master/pengaturan-sistem*',
     ]);
 @endphp
 
-
 <li class="nav-item {{ $isMasterData ? 'active' : '' }}">
     <a class="nav-link {{ $isMasterData ? '' : 'collapsed' }}" href="#" data-toggle="collapse"
-        data-target="#collapsePages" aria-expanded="{{ $isMasterData ? 'true' : 'false' }}"
-        aria-controls="collapsePages">
+        data-target="#collapseMasterData" aria-expanded="{{ $isMasterData ? 'true' : 'false' }}"
+        aria-controls="collapseMasterData">
         <i class="fas fa-fw fa-user-cog"></i>
         <span>Master Data</span>
     </a>
 
-    <div id="collapsePages" class="collapse {{ $isMasterData ? 'show' : '' }}" aria-labelledby="headingPages"
+    <div id="collapseMasterData" class="collapse {{ $isMasterData ? 'show' : '' }}" aria-labelledby="headingMasterData"
         data-parent="#accordionSidebar">
         <div class="bg-white py-2 collapse-inner rounded">
             <h6 class="collapse-header">Master Data</h6>
             @if ($isAdmin)
-                {{-- <a class="collapse-item {{ request()->is('akun/pengaturan') ? 'active' : '' }}"
-                    href="{{ route('akun.pengaturan') }}">
-                    <i class="fas fa-fw fa-sliders-h mr-2 text-gray-600"></i>Pengaturan
-                </a> --}}
                 <a class="collapse-item {{ request()->is('master/jabatan*') ? 'active' : '' }}"
                     href="{{ route('master.daftarJabatan') }}">
                     <i class="fas fa-fw fa-briefcase mr-2 text-gray-600"></i>Jabatan
@@ -89,18 +84,23 @@
                     href="{{ route('master.daftarToko') }}">
                     <i class="fas fa-fw fa-briefcase mr-2 text-gray-600"></i>Toko
                 </a>
+            @endif
+            @if ($isAdmin || $isGudang)
                 <a class="collapse-item {{ request()->is('master/supplier*') ? 'active' : '' }}"
                     href="{{ route('master.daftarSupplier') }}">
                     <i class="fas fa-fw fa-briefcase mr-2 text-gray-600"></i>Supplier
                 </a>
+            @endif
+            @if ($isAdmin)
                 <a class="collapse-item {{ request()->is('master/pengaturan-sistem*') ? 'active' : '' }}"
                     href="{{ route('master.daftarPengaturanSistem') }}">
                     <i class="fas fa-fw fa-briefcase mr-2 text-gray-600"></i>Pengaturan Sistem
                 </a>
+            @endif
         </div>
     </div>
 </li>
-@endif
+
 
 
 @php
@@ -109,6 +109,7 @@
         'gudang/bahan-baku-keluar*',
         'gudang/produk-masuk*',
         'gudang/laporan-harian*',
+        'gudang/laporan-produk*',
     ]);
 @endphp
 
@@ -139,8 +140,12 @@
                 <i class="fas fa-fw fa-sign-out-alt mr-2 text-gray-600"></i>Hasil Produksi
             </a>
             <a class="collapse-item {{ request()->is('gudang/laporan-harian') ? 'active' : '' }}"
-                href="{{ route('gudang.laporan.harian') }}">
-                <i class="fas fa-fw fa-arrow-circle-down mr-2 text-gray-600"></i>Laporan
+                href="{{ route('gudang.laporan-harian') }}">
+                <i class="fas fa-fw fa-arrow-circle-down mr-2 text-gray-600"></i>Laporan Bahan Baku
+            </a>
+            <a class="collapse-item {{ request()->is('gudang/laporan-produk') ? 'active' : '' }}"
+                href="{{ route('gudang.laporan-produk') }}">
+                <i class="fas fa-fw fa-arrow-circle-down mr-2 text-gray-600"></i>Laporan Produk
             </a>
         </div>
     </div>

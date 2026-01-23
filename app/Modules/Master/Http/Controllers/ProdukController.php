@@ -16,7 +16,22 @@ class ProdukController
 
     public function data()
     {
-        $rows = Produk::orderBy('id')->get();
+        $rows = Produk::query()
+            ->leftJoin('karyawan as pembuat', 'pembuat.id', '=', 'produk.id_buat')
+            ->leftJoin('karyawan as pengubah', 'pengubah.id', '=', 'produk.id_update')
+            ->select([
+                'produk.id',
+                'produk.nama',
+                'produk.foto',
+                'produk.harga',
+                'produk.satuan',
+                'produk.deskripsi',
+                'produk.stok',
+                'pembuat.nama as nama_pembuat',
+                'pengubah.nama as nama_pengubah',
+            ])
+            ->orderBy('produk.id')
+            ->get();
 
         $data = $rows->map(function ($r) {
             return [
@@ -27,11 +42,14 @@ class ProdukController
                 'satuan' => $r->satuan,
                 'deskripsi' => $r->deskripsi,
                 'stok' => $r->stok,
+                'nama_pembuat' => $r->nama_pembuat ?? '-',
+                'nama_pengubah' => $r->nama_pengubah ?? '-',
             ];
         });
 
         return response()->json(['data' => $data]);
     }
+
 
     // Optional server-side ID generator (PRD-001)
     public function getNewId()
@@ -56,7 +74,6 @@ class ProdukController
             'harga' => 'required|integer',
             'satuan' => 'required|string|max:50',
             'deskripsi' => 'nullable|string',
-            'stok' => 'required|integer',
             'foto1' => 'nullable|file|mimes:jpg,jpeg|max:1024',
             'foto2' => 'nullable|file|mimes:jpg,jpeg|max:1024',
             'foto3' => 'nullable|file|mimes:jpg,jpeg|max:1024',
@@ -84,10 +101,10 @@ class ProdukController
         $p->nama = $request->nama;
         $p->harga = (int) $request->harga;
         $p->satuan = $request->satuan;
+        $p->stok = 0;
         $p->deskripsi = $request->deskripsi;
-        $p->stok = (int) $request->stok;
+        $p->id_buat = auth('web')->id();
         $p->tanggal_buat = now();
-        $p->tanggal_update = now();
         $p->foto = null; // set after storing file1
         $p->save();
 
@@ -128,7 +145,6 @@ class ProdukController
             'harga' => 'required|integer',
             'satuan' => 'required|string|max:50',
             'deskripsi' => 'nullable|string',
-            'stok' => 'required|integer',
             'foto1' => 'nullable|file|mimes:jpg,jpeg|max:1024',
             'foto2' => 'nullable|file|mimes:jpg,jpeg|max:1024',
             'foto3' => 'nullable|file|mimes:jpg,jpeg|max:1024',
@@ -152,7 +168,7 @@ class ProdukController
         $p->harga = (int) $request->harga;
         $p->satuan = $request->satuan;
         $p->deskripsi = $request->deskripsi;
-        $p->stok = (int) $request->stok;
+        $p->id_update = auth('web')->id();
         $p->tanggal_update = now();
         $p->save();
 

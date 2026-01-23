@@ -24,68 +24,49 @@ class SupplierController
         return view('master::DaftarSupplier', compact('Toko'));
     }
 
-    public function dt() {
-        $supplier = Supplier::all();
+    public function dt()
+    {
+        $rows = Supplier::query()
+            ->leftJoin('karyawan as pembuat', 'pembuat.id', '=', 'supplier.id_buat')
+            ->leftJoin('karyawan as pengubah', 'pengubah.id', '=', 'supplier.id_update')
+            ->select([
+                'supplier.id',
+                'supplier.nama_toko',
+                'supplier.alamat',
+                'pembuat.nama as nama_pembuat',
+                'pengubah.nama as nama_pengubah',
+            ])
+            ->get();
 
-        $data = $supplier->map(function ($t) {
+        $data = $rows->map(function ($t) {
             return [
-                'id'             => $t->id,
-                'nama_toko'      => $t->nama_toko,
-                'alamat'         => $t->alamat,
+                'id' => $t->id,
+                'nama_toko' => $t->nama_toko,
+                'alamat' => $t->alamat,
+                'nama_pembuat' => $t->nama_pembuat ?? '-',
+                'nama_pengubah' => $t->nama_pengubah ?? '-',
             ];
         });
-    
+
         return response()->json(compact('data'));
     }
-
-    // public function data()
-    // {
-    //     // Eager-load relasi supaya bisa ambil nama sales & nama pelanggan
-    //     $list = Toko::with([
-    //         'salesPembawa',
-    //         'CPtoko'
-    //     ])->get();
-
-    //     // Map supaya response per baris lebih sederhana untuk DataTables
-    //     $data = $list->map(function ($t) {
-    //         return [
-    //             'id'             => $t->id,
-    //             'id_karyawan'    => $t->id_karyawan,
-    //             'id_pelanggan'   => $t->id_pelanggan,
-    //             'nama_toko'      => $t->nama_toko,
-    //             'alamat'         => $t->alamat,
-    //             'lintang'        => $t->lintang,
-    //             'bujur'          => $t->bujur,
-    //             'nama_karyawan'  => $t->salesPembawa->nama ?? '-',
-    //             'nama_pelanggan' => $t->CPtoko->nama ?? '-',
-    //         ];
-    //     });
-
-    //     // Daftar untuk dropdown (sales dan pelanggan)
-    //     $sales = Karyawan::where('id_jabatan', '004')->select('id', 'nama')->get();
-    //     $pelanggan = Pelanggan::select('id', 'nama')->get();
-
-    //     // Kembalikan JSON: { data: [...], sales: [...], pelanggan: [...] }
-    //     return response()->json(compact('data', 'sales', 'pelanggan'));
-    // }
-
 
     public function simpanSupplier(Request $request)
     {
         $validated = $request->validate([
-            'id'            => 'required',
-            'nama_toko'          => 'required|max:100',
-            'alamat'        => 'required',
+            'id' => 'required',
+            'nama_toko' => 'required|max:100',
+            'alamat' => 'required',
         ]);
 
         $idToko = $validated['id'];
 
         $Toko = Supplier::create([
-            'id'            => $idToko,
-            'nama_toko'          => $validated['nama_toko'],
-            'alamat'        => $validated['alamat'],
-            'id_buat'       => auth('web')->id(),
-            'tanggal_buat'  =>now(),
+            'id' => $idToko,
+            'nama_toko' => $validated['nama_toko'],
+            'alamat' => $validated['alamat'],
+            'id_buat' => auth('web')->id(),
+            'tanggal_buat' => now(),
         ]);
 
         if ($request->ajax()) {
@@ -100,15 +81,15 @@ class SupplierController
         $Toko = Supplier::findOrFail($id);
 
         $request->validate([
-            'nama_toko'          => 'required|max:100',
-            'alamat'        => 'required',
+            'nama_toko' => 'required|max:100',
+            'alamat' => 'required',
         ]);
 
         $Toko->update([
 
-            'nama_toko'     =>$request->nama_toko,     
-            'alamat'        =>$request->alamat,   
-            'id_update'     => auth('web')->id(),
+            'nama_toko' => $request->nama_toko,
+            'alamat' => $request->alamat,
+            'id_update' => auth('web')->id(),
             'tanggal_update' => now(),
         ]);
 
@@ -123,7 +104,7 @@ class SupplierController
     {
         $Toko = Supplier::find($id);
 
-        if (! $Toko) {
+        if (!$Toko) {
             if ($request->ajax()) {
                 return response()->json(['status' => 'error', 'message' => 'Data Supplier tidak ditemukan.'], 404);
             }

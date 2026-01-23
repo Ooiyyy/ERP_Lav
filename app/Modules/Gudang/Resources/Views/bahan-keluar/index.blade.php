@@ -145,10 +145,20 @@ $(function () {
     let rowIndex = 0;
 
     // ================= DATATABLE =================
-    $('#tableBahanKeluar').DataTable({
-        pageLength: 10,
-        responsive: true
-    });
+   $('#tableBahanKeluar').DataTable({
+    pageLength: 10,
+    responsive: true,
+    language: {
+        search: "Search:",
+        lengthMenu: "Show _MENU_ entries",
+        info: "Showing _START_ to _END_ of _TOTAL_ entries",
+        zeroRecords: "No matching records found",
+        paginate: {
+            previous: "Previous",
+            next: "Next"
+        }
+    }
+});
 
     // ================= ADD ROW =================
     $('#btnAddRowKeluar').click(function () {

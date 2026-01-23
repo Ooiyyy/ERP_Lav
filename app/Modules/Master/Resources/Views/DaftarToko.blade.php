@@ -32,6 +32,8 @@
                                 <th>Alamat</th>
                                 <th>Lintang</th>
                                 <th>Bujur</th>
+                                <th>Pembuat</th>
+                                <th>Pengubah</th>
                                 <th>Aksi</th>
                             </tr>
                         </thead>
@@ -44,7 +46,8 @@
     {{-- MODAL TAMBAH Toko --}}
     <div class="modal fade" id="modalTambahToko" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-lg">
-            <form id="formTambahToko" method="POST" action="{{ route('master.simpanToko') }}" enctype="multipart/form-data">
+            <form id="formTambahToko" method="POST" action="{{ route('master.simpanToko') }}"
+                enctype="multipart/form-data">
                 @csrf
                 <div class="modal-content">
                     <div class="modal-header">
@@ -286,6 +289,12 @@
                     },
                     {
                         data: 'bujur'
+                    },
+                    {
+                        data: 'nama_pembuat'
+                    },
+                    {
+                        data: 'nama_pengubah'
                     },
                     {
                         data: null,

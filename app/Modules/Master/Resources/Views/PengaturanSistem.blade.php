@@ -28,6 +28,8 @@
                                 <th>ID Konfigurasi</th>
                                 <th>Ketentuan</th>
                                 <th>Keterangan</th>
+                                <th>Pembuat</th>
+                                <th>Pengubah</th>
                                 <th>Aksi</th>
                             </tr>
                         </thead>
@@ -170,6 +172,12 @@
                     },
                     {
                         data: 'keterangan'
+                    },
+                    {
+                        data: 'nama_pembuat'
+                    },
+                    {
+                        data: 'nama_pengubah'
                     },
                     {
                         data: null,

@@ -59,10 +59,11 @@
                 <div class="modal-body">
 
                     <input type="datetime-local"
-                    name="tanggal_transaksi"
-                    id="tanggal_transaksi"
-                    class="form-control mb-2"
-                    required>
+                           name="tanggal_transaksi"
+                           id="tanggal_transaksi"
+                           class="form-control mb-2"
+                           required>
+
                     <table class="table table-bordered" id="tableDetail">
                         <thead>
                             <tr>
@@ -135,25 +136,45 @@ $('#btnAddRow').click(function () {
     let row = `
     <tr>
         <td>
-            <select name="items[${rowIndex}][id_produk]" class="form-control" required>
+            <select name="items[${rowIndex}][id_produk]"
+                    class="form-control produk-select"
+                    required>
                 <option value="">-- Pilih --</option>
                 @foreach(\App\Models\Produk::all() as $p)
-                    <option value="{{ $p->id }}">{{ $p->nama }}</option>
+                    <option value="{{ $p->id }}"
+                            data-satuan="{{ $p->satuan }}">
+                        {{ $p->nama }}
+                    </option>
                 @endforeach
             </select>
         </td>
         <td>
-            <input type="number" name="items[${rowIndex}][jumlah]" class="form-control" min="1" required>
+            <input type="number"
+                   name="items[${rowIndex}][jumlah]"
+                   class="form-control"
+                   min="1"
+                   required>
         </td>
         <td>
-            <input type="text" name="items[${rowIndex}][satuan]" class="form-control" required>
+            <input type="text"
+                   class="form-control satuan"
+                   readonly>
         </td>
         <td>
-            <button type="button" class="btn btn-danger btn-sm btn-remove">X</button>
+            <button type="button"
+                    class="btn btn-danger btn-sm btn-remove">
+                X
+            </button>
         </td>
     </tr>`;
     $('#tableDetail tbody').append(row);
     rowIndex++;
+});
+
+// ================= AUTO ISI SATUAN =================
+$(document).on('change', '.produk-select', function () {
+    let satuan = $(this).find(':selected').data('satuan') || '';
+    $(this).closest('tr').find('.satuan').val(satuan);
 });
 
 // ================= REMOVE ROW =================
@@ -164,7 +185,7 @@ $(document).on('click', '.btn-remove', function(){
 // ================= RESET FORM =================
 function resetForm() {
     $('#formProdukMasuk')[0].reset();
-    $('#produk_masuk_id').val('');
+    $('#id_produk_masuk').val('');
     $('#tableDetail tbody').html('');
     $('#modalTitle').text('Tambah Produk Masuk');
     rowIndex = 0;
@@ -219,6 +240,7 @@ $(document).on('click', '.btn-detail', function() {
     $.get("{{ url('gudang/produk-masuk') }}/" + id, function(res) {
         $('#detail_id').text(res.data.id);
         $('#detail_tanggal').text(res.data.tanggal_transaksi);
+
         let rows = '';
         res.data.detail.forEach(function(item) {
             rows += `
@@ -247,14 +269,14 @@ $(document).on('click', '.btn-edit', function() {
             res.data.tanggal_transaksi.replace(' ', 'T').slice(0,16)
         );
 
-
         res.data.detail.forEach(function(item) {
             $('#btnAddRow').click();
             let idx = rowIndex - 1;
 
-            $(`select[name="items[${idx}][id_produk]"]`).val(item.id_produk);
+            let select = $(`select[name="items[${idx}][id_produk]"]`);
+            select.val(item.id_produk).trigger('change');
+
             $(`input[name="items[${idx}][jumlah]"]`).val(item.jumlah);
-            $(`input[name="items[${idx}][satuan]"]`).val(item.satuan);
         });
 
         $('#modalProdukMasuk').modal('show');

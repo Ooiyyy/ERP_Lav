@@ -299,7 +299,7 @@ $(function() {
         if ((p.jenis_bayar || p.method || '').toLowerCase() === 'cash') {
             method = 'CASH';
         }
-        // VA / ONLINE ? ambil dari channel
+        // VA / ONLINE → ambil dari channel
         else {
             if (p.channel) {
                 method = String(p.channel).toUpperCase(); // DANA / BRI / GOPAY / QRIS
@@ -337,11 +337,11 @@ $(function() {
         // NOMINAL
         var nominal = Number(p.nominal || p.amount || 0);
 
-        // ? STATUS (LOGIKA UTAMA)
+        // 🔥 STATUS (LOGIKA UTAMA)
         var status = 'PAID'; // default untuk CASH
 
         if (p.payment_link) {
-            // VA ? ambil dari DB
+            // VA → ambil dari DB
             status = (p.status || 'PENDING').toUpperCase();
         }
 
@@ -410,11 +410,11 @@ $(function() {
                 var method = (p.method || p.metode || p.jenis_bayar || '').toLowerCase();
                 var status = (p.status || '').toLowerCase();
 
-                // ? CASH SELALU DIHITUNG
+                // ✅ CASH SELALU DIHITUNG
                 if (method === 'cash') {
                     sum += nom;
                 }
-                // ? VA HANYA JIKA PAID
+                // ✅ VA HANYA JIKA PAID
                 else if (method === 'va' && status === 'paid') {
                     sum += nom;
                 }
@@ -574,37 +574,41 @@ $(function() {
     }
 
     function exitSnapMode() {
-        // try to close snap iframe via API if available
-        try { if (window.snap && typeof window.snap.close === 'function') window.snap.close(); } catch(e){}
-
-        // restore header/footer/body
-        var origBody = $modalBayar.data('origBody') || '';
-        var origHeader = $modalBayar.data('origHeader') || '';
-        var origFooter = $modalBayar.data('origFooter') || '';
-
-        $modalBayar.find('.modal-body').html(origBody);
-        $modalBayar.find('.modal-header').html(origHeader).show();
-        $modalBayar.find('.modal-footer').html(origFooter).show();
-
-        // restore backdrop/keyboard default (Bootstrap)
-        try {
-            var modalEl = $modalBayar[0];
-            if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
-                var inst = bootstrap.Modal.getInstance(modalEl);
-                if (inst) inst._config.backdrop = true, inst._config.keyboard = true;
-            }
-        } catch(e){}
-
-        // re-bind any controls that were replaced (we rely on openBayarModal to re-fill fields when reopened)
-        setTimeout(function(){ checkFormReadyFull(); }, 120);
+    // kalau belum pernah masuk snap-mode, jangan ngapa-ngapain
+    if (!$modalBayar.data('origBody')) {
+        return;
     }
+
+    try { 
+        if (window.snap && typeof window.snap.close === 'function') window.snap.close(); 
+    } catch(e){}
+
+    var origBody = $modalBayar.data('origBody') || '';
+    var origHeader = $modalBayar.data('origHeader') || '';
+    var origFooter = $modalBayar.data('origFooter') || '';
+
+    $modalBayar.find('.modal-body').html(origBody);
+    $modalBayar.find('.modal-header').html(origHeader).show();
+    $modalBayar.find('.modal-footer').html(origFooter).show();
+
+    try {
+        var modalEl = $modalBayar[0];
+        if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+            var inst = bootstrap.Modal.getInstance(modalEl);
+            if (inst) inst._config.backdrop = true, inst._config.keyboard = true;
+        }
+    } catch(e){}
+
+    setTimeout(function(){ checkFormReadyFull(); }, 120);
+}
+
 
     // --------------------
     // Submit handler (AJAX)
     // --------------------
     $form.on('submit.pay', function(e) {
         e.preventDefault();
-        if (!checkFormReadyFull()) return Swal.fire('Perhatian', 'Lengkapi metode, jumlah (? sisa) dan pastikan keranjang tidak kosong.', 'warning');
+        if (!checkFormReadyFull()) return Swal.fire('Perhatian', 'Lengkapi metode, jumlah (≤ sisa) dan pastikan keranjang tidak kosong.', 'warning');
 
         var method = $('#pay_method').val();
         var orderId = $('#pay_order_id').val() || '';
@@ -790,14 +794,15 @@ $(function() {
     }
 
     function resetBayarModal() {
-        // DON'T reset totals / amounts (so user sees them), only reset method/snap state and button
         $('#pay_method').val('');
         $('#snap-container').hide().empty();
         $('#btnPaySubmit').prop('disabled', true).addClass('disabled').text('Bayar');
         $('#pay_msg').text('');
-        // ensure modal-body restored if we were in snap-mode
+
+        // ✅ hanya restore body kalau memang sebelumnya masuk snap-mode
         exitSnapMode();
     }
+
 
     function closeModalByEl($modal) {
         if (!$modal || !$modal.length) return;

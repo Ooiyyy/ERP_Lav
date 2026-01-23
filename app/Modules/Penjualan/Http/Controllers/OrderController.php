@@ -40,15 +40,6 @@ class OrderController
             $tokos = collect();
         }
 
-        // Ambil sales dari model Karyawan (kolom nama)
-        // if (class_exists(\App\Models\Karyawan::class)) {
-        //     $sales = Karyawan::orderBy('nama')->get();
-        // } elseif (Schema::hasTable('sales')) {
-        //     $sales = DB::table('sales')->orderBy('id')->get();
-        // } else {
-        //     $sales = collect();
-        // }
-
         // Ambil daftar sales: join karyawan -> jabatan
         $sales = collect();
 
@@ -71,9 +62,6 @@ class OrderController
             $sales = collect();
         }
 
-
-
-
         // ambil orders dengan relasi sales & toko (pastikan relasi di model Order ada)
         $orders = Order::with(['detailOrders', 'sales', 'toko'])
             ->orderBy('tanggal_buat', 'desc')
@@ -90,59 +78,34 @@ class OrderController
 
     public function data(Request $req)
     {
-        $draw   = (int) $req->input('draw', 1);
-        $start  = (int) $req->input('start', 0);
+        $draw = (int) $req->input('draw', 1);
+        $start = (int) $req->input('start', 0);
         $length = (int) $req->input('length', 10);
-        $search = trim((string)$req->input('search.value', ''));
+        $search = trim((string) $req->input('search.value', ''));
 
-        // base: hanya pesanan BELUM LUNAS
-        $baseQuery = Order::with(['detailOrders', 'sales', 'toko'])
-            ->whereRaw('
-            (
-                SELECT COALESCE(SUM(nominal),0)
-                FROM pembayaran_cash
-                WHERE id_order = `order`.id
-            )
-            +
-            (
-                SELECT COALESCE(SUM(nominal),0)
-                FROM pembayaran_va
-                WHERE id_order = `order`.id
-                AND status = "paid"   -- ⬅️ INI KUNCI
-            )
-            <
-            (
-                SELECT COALESCE(SUM(jumlah * harga),0)
-                FROM detail_order
-                WHERE id_transaksi = `order`.id
-            )
-        ')
-            ->orderBy('tanggal_buat', 'desc');
-        // total sebelum search (harus hanya yang belum lunas)
-        $recordsTotal = $baseQuery->count();
+        // =====================================================
+        // 1) Ambil semua order + relasi
+        // =====================================================
+        $orders = Order::with(['detailOrders', 'sales', 'toko'])
+            ->orderBy('tanggal_buat', 'desc')
+            ->get();
 
-        // apply search
-        if ($search !== '') {
-            $baseQuery = $baseQuery->where(function ($q) use ($search) {
-                $q->where('id', 'like', "%{$search}%")
-                    ->orWhereHas('toko', fn($t) =>
-                    $t->where('nama_toko', 'like', "%{$search}%")
-                        ->orWhere('nama', 'like', "%{$search}%"))
-                    ->orWhereHas('sales', fn($s) =>
-                    $s->where('nama', 'like', "%{$search}%"));
-            });
+        if ($orders->isEmpty()) {
+            return response()->json([
+                'draw' => $draw,
+                'recordsTotal' => 0,
+                'recordsFiltered' => 0,
+                'data' => [],
+            ]);
         }
 
-        $recordsFiltered = $baseQuery->count();
+        // =====================================================
+        // 2) Hitung total & paid per order
+        // =====================================================
+        $result = $orders->map(function ($order) {
 
-        $rows = $baseQuery->skip($start)->take($length)->get();
-
-        // mapping data ke datatables...
-
-
-        $data = $rows->map(function ($order) {
             $total = (int) $order->detailOrders->sum(function ($d) {
-                return ((int)($d->jumlah ?? 0)) * ((int)($d->harga ?? 0));
+                return ((int) ($d->jumlah ?? 0)) * ((int) ($d->harga ?? 0));
             });
 
             $paidCash = (int) DB::table('pembayaran_cash')
@@ -151,7 +114,7 @@ class OrderController
 
             $paidVa = (int) DB::table('pembayaran_va')
                 ->where('id_order', $order->id)
-                ->where('status', 'paid')   // ⬅️ KUNCI UTAMA
+                ->where('status', 'paid')
                 ->sum('nominal');
 
             $paid = $paidCash + $paidVa;
@@ -159,22 +122,20 @@ class OrderController
             $remaining = max(0, $total - $paid);
             $isLunas = ($total > 0 && $paid >= $total);
 
-            // Ambil nama sales dari relasi Karyawan (kolom 'nama') atau fallback
             $salesName = optional($order->sales)->nama
                 ?? optional($order->sales)->name
                 ?? optional($order->sales)->nama_sales
                 ?? $order->id_sales;
 
-            // tambahkan ini:
             $salesPhone = optional($order->sales)->no_hp
                 ?? optional($order->sales)->phone
                 ?? null;
 
-            // Ambil nama toko: cek beberapa kemungkinan kolom
             $tokoName = optional($order->toko)->nama_toko
                 ?? optional($order->toko)->nama
                 ?? $order->id_toko;
 
+            // tombol action (tetap punyamu)
             $shouldDisableActions = ($paid > 0 && $remaining > 0);
             $disabledAttr = $shouldDisableActions ? ' disabled aria-disabled="true"' : '';
             $disabledClass = $shouldDisableActions ? ' disabled' : '';
@@ -189,7 +150,7 @@ class OrderController
                 'id' => $order->id,
                 'created_at' => $order->tanggal_buat,
                 'sales_name' => $salesName,
-                'sales_phone' => $salesPhone,   // <<< baru
+                'sales_phone' => $salesPhone,
                 'toko_name' => $tokoName,
                 'calculated_total' => $total,
                 'paid' => $paid,
@@ -198,6 +159,35 @@ class OrderController
                 'actions' => $actions,
             ];
         });
+
+        // =====================================================
+        // 3) Filter: tampilkan hanya PESANAN BELUM LUNAS
+        // =====================================================
+        $result = $result->filter(fn($r) => (int) $r['is_lunas'] === 0)->values();
+
+        // =====================================================
+        // 4) Search DataTables (seperti History)
+        // =====================================================
+        if ($search !== '') {
+            $s = mb_strtolower($search);
+
+            $result = $result->filter(function ($r) use ($s) {
+                foreach (['id', 'created_at', 'sales_name', 'sales_phone', 'toko_name', 'calculated_total', 'paid', 'remaining'] as $f) {
+                    if (mb_stripos((string) ($r[$f] ?? ''), $s) !== false) {
+                        return true;
+                    }
+                }
+                return false;
+            })->values();
+        }
+
+        // =====================================================
+        // 5) Records + Pagination
+        // =====================================================
+        $recordsTotal = $result->count();
+        $recordsFiltered = $recordsTotal;
+
+        $data = $result->slice($start, $length)->values();
 
         return response()->json([
             'draw' => $draw,
@@ -212,10 +202,10 @@ class OrderController
         // PRODUK (dinamis: stok)
         $products = Produk::orderBy('id')->get()->map(function ($p) {
             return [
-                'id'     => $p->id,
-                'name'   => $p->nama ?? $p->name ?? '',
-                'harga'  => (int) ($p->harga ?? 0),
-                'stok'   => (int) ($p->stok ?? 0),
+                'id' => $p->id,
+                'name' => $p->nama ?? $p->name ?? '',
+                'harga' => (int) ($p->harga ?? 0),
+                'stok' => (int) ($p->stok ?? 0),
                 'satuan' => $p->satuan ?? '',
             ];
         });
@@ -246,8 +236,8 @@ class OrderController
 
         return response()->json([
             'products' => $products,
-            'tokos'    => $tokos,
-            'sales'    => $sales,
+            'tokos' => $tokos,
+            'sales' => $sales,
         ]);
     }
 
@@ -306,7 +296,7 @@ class OrderController
                 ->where('id', $req->id_toko)
                 ->where('id_karyawan', $req->id_sales)
                 ->exists();
-        
+
             if (!$valid) {
                 return response()->json([
                     'success' => false,
@@ -314,7 +304,7 @@ class OrderController
                 ], 422);
             }
         }
-        
+
 
         $validator = Validator::make($req->all(), [
             'id_toko' => 'nullable|string',
@@ -350,13 +340,13 @@ class OrderController
 
             $nextSeq = $maxSeq + 1;
             // format 2 digit (01, 02). Ubah 2 => 3 jika mau ORD-001
-            $orderId = 'ORD-' . str_pad($nextSeq, 2, '0', STR_PAD_LEFT);
+            $orderId = 'ORD-' . str_pad($nextSeq, 1, STR_PAD_LEFT);
 
             // --- end generate id ---
 
             $attrs = [
                 'id' => $orderId,
-                'id_sales' => $req->id_sales  ?? auth('web')->id() ?? null,
+                'id_sales' => $req->id_sales ?? auth('web')->id() ?? null,
                 'id_toko' => $req->id_toko ?: null,
                 'id_buat' => $req->id_buat ?? auth('web')->id() ?? null,
                 'id_update' => $req->id_update ?? auth('web')->id() ?? null,
@@ -377,8 +367,10 @@ class OrderController
                 }
 
                 $prod = Produk::where('id', $prodId)->lockForUpdate()->first();
-                if (!$prod) throw new \Exception("Produk dengan ID {$prodId} tidak ditemukan.");
-                if (((int)$prod->stok) < $qty) throw new \Exception("Stok produk \"{$prod->nama}\" tidak mencukupi. (tersedia: {$prod->stok})");
+                if (!$prod)
+                    throw new \Exception("Produk dengan ID {$prodId} tidak ditemukan.");
+                if (((int) $prod->stok) < $qty)
+                    throw new \Exception("Stok produk \"{$prod->nama}\" tidak mencukupi. (tersedia: {$prod->stok})");
 
                 $detailId = 'D' . Str::upper(Str::random(10));
                 $subtotal = $qty * $unitPrice;
@@ -395,7 +387,7 @@ class OrderController
                     'tanggal_buat' => now(),
                 ]);
 
-                $prod->stok = max(0, ((int)$prod->stok) - $qty);
+                $prod->stok = max(0, ((int) $prod->stok) - $qty);
                 $prod->save();
 
                 $total += $subtotal;
@@ -438,7 +430,7 @@ class OrderController
                         'jumlah' => (int) $d->jumlah,
                         'harga' => (int) $d->harga,
                         'satuan' => $d->satuan ?? '',
-                        'subtotal' => (int) ($d->subtotal ?? ((int)$d->jumlah * (int)$d->harga)),
+                        'subtotal' => (int) ($d->subtotal ?? ((int) $d->jumlah * (int) $d->harga)),
                     ];
                 })->values(),
             ]);
@@ -471,7 +463,7 @@ class OrderController
                 ->where('id', $req->id_toko)
                 ->where('id_karyawan', $req->id_sales)
                 ->exists();
-        
+
             if (!$valid) {
                 return response()->json([
                     'success' => false,
@@ -479,7 +471,7 @@ class OrderController
                 ], 422);
             }
         }
-        
+
 
         $validator = Validator::make($req->all(), [
             'items' => 'required|array|min:1',
@@ -498,8 +490,8 @@ class OrderController
                 && array_key_exists('id_produk', $it)
                 && array_key_exists('jumlah', $it)
                 && array_key_exists('harga', $it)
-                && trim((string)$it['id_produk']) !== ''
-                && (int)$it['jumlah'] > 0;
+                && trim((string) $it['id_produk']) !== ''
+                && (int) $it['jumlah'] > 0;
         }));
 
         if (count($items) === 0) {
@@ -513,7 +505,7 @@ class OrderController
             foreach ($order->detailOrders as $old) {
                 $prod = Produk::where('id', $old->id_produk)->lockForUpdate()->first();
                 if ($prod) {
-                    $prod->stok = ((int)$prod->stok) + (int)$old->jumlah;
+                    $prod->stok = ((int) $prod->stok) + (int) $old->jumlah;
                     $prod->save();
                 }
             }
@@ -532,8 +524,10 @@ class OrderController
                 }
 
                 $prod = Produk::where('id', $prodId)->lockForUpdate()->first();
-                if (!$prod) throw new \Exception("Produk dengan ID {$prodId} tidak ditemukan.");
-                if (((int)$prod->stok) < $qty) throw new \Exception("Stok produk \"{$prod->nama}\" tidak mencukupi untuk update. (tersedia: {$prod->stok})");
+                if (!$prod)
+                    throw new \Exception("Produk dengan ID {$prodId} tidak ditemukan.");
+                if (((int) $prod->stok) < $qty)
+                    throw new \Exception("Stok produk \"{$prod->nama}\" tidak mencukupi untuk update. (tersedia: {$prod->stok})");
 
                 $subtotal = $qty * $unitPrice;
                 DetailOrder::create([
@@ -546,14 +540,16 @@ class OrderController
                     'subtotal' => $subtotal,
                 ]);
 
-                $prod->stok = ((int)$prod->stok) - $qty;
+                $prod->stok = ((int) $prod->stok) - $qty;
                 $prod->save();
 
                 $total += $subtotal;
             }
 
-            if ($req->filled('id_sales')) $order->id_sales = $req->id_sales;
-            if ($req->filled('id_toko')) $order->id_toko = $req->id_toko;
+            if ($req->filled('id_sales'))
+                $order->id_sales = $req->id_sales;
+            if ($req->filled('id_toko'))
+                $order->id_toko = $req->id_toko;
             $order->id_update = $req->id_update ?? $order->id_update;
 
             $table = $order->getTable();
@@ -581,7 +577,7 @@ class OrderController
             foreach ($order->detailOrders as $old) {
                 $prod = Produk::where('id', $old->id_produk)->lockForUpdate()->first();
                 if ($prod) {
-                    $prod->stok = ((int)$prod->stok) + (int)$old->jumlah;
+                    $prod->stok = ((int) $prod->stok) + (int) $old->jumlah;
                     $prod->save();
                 }
             }
@@ -601,7 +597,8 @@ class OrderController
     public function detail($id)
     {
         $order = Order::with(['detailOrders', 'toko', 'sales'])->find($id);
-        if (!$order) return response()->json(['message' => 'Order not found'], 404);
+        if (!$order)
+            return response()->json(['message' => 'Order not found'], 404);
 
         $items = $order->detailOrders->map(function ($d) {
             return [
@@ -645,8 +642,8 @@ class OrderController
         return response()->json([
             'sales_name' => $salesName,
             'sales_phone' => optional($order->sales)->no_hp ?? null,
-            'toko_name'  => $tokoName,
-            'items'      => $items,
+            'toko_name' => $tokoName,
+            'items' => $items,
         ]);
     }
 
@@ -654,7 +651,7 @@ class OrderController
     public function summary($id)
     {
         $order = Order::with('detailOrders')->findOrFail($id);
-        $total = (int) $order->detailOrders->sum(fn($d) => ((int)$d->jumlah * (int)$d->harga));
+        $total = (int) $order->detailOrders->sum(fn($d) => ((int) $d->jumlah * (int) $d->harga));
 
         $paidCash = (int) DB::table('pembayaran_cash')
             ->where('id_order', $order->id)
@@ -754,14 +751,14 @@ class OrderController
     {
         $validator = Validator::make($req->all(), [
             'order_id' => 'required|exists:order,id',
-            'jumlah_bayar'  => 'required',
+            'jumlah_bayar' => 'required',
         ]);
 
         if ($validator->fails()) {
             return response()->json(['success' => false, 'errors' => $validator->errors()->all()], 422);
         }
 
-        $raw = (string)($req->jumlah_bayar ?? $req->nominal ?? '0');
+        $raw = (string) ($req->jumlah_bayar ?? $req->nominal ?? '0');
         $nominal = intval(preg_replace('/\D/', '', $raw));
 
         if ($nominal < 1) {

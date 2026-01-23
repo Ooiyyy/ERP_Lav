@@ -1,3 +1,10 @@
+@php
+    $role = auth('web')->user()->karyawan->id_jabatan;
+    $isAdmin = in_array($role, ['001']);
+    $isGudang = in_array($role, ['002']);
+@endphp
+@if ($isAdmin)
+
 @extends('layouts.app')
 
 @section('content')
@@ -72,6 +79,7 @@
 
     </div>
 @endsection
+@endif
 
 @push('scripts')
     <!-- Highcharts via CDN -->

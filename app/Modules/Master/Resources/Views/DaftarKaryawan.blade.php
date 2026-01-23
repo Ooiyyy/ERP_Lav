@@ -35,6 +35,8 @@
                                 <th>Status</th>
                                 <th>Tempat Lahir</th>
                                 <th>Tanggal Lahir</th>
+                                <th>Pembuat</th>
+                                <th>Pengubah</th>
                                 <th>Aksi</th>
                             </tr>
                         </thead>
@@ -419,7 +421,7 @@
                         data: 'nama'
                     },
                     {
-                        data: 'jabatan.nama'
+                        data: 'jabatan'
                     },
                     {
                         data: 'alamat'
@@ -438,6 +440,12 @@
                     },
                     {
                         data: 'tanggal_lahir'
+                    },
+                    {
+                        data: 'nama_pembuat'
+                    },
+                    {
+                        data: 'nama_pengubah'
                     },
                     {
                         data: null,

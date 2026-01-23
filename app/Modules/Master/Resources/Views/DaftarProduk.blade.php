@@ -31,6 +31,8 @@
                                 <th>Satuan</th>
                                 <th>Deskripsi</th>
                                 <th>Stok</th>
+                                <th>Pembuat</th>
+                                <th>Pengubah</th>
                                 <th>Aksi</th>
                             </tr>
                         </thead>
@@ -93,19 +95,14 @@
                         </div>
 
                         <div class="form-row">
-                            <div class="form-group col-md-4">
+                            <div class="form-group col-md-6">
                                 <label for="harga">Harga</label>
                                 <input type="number" name="harga" id="harga" class="form-control" value="0"
                                     required>
                             </div>
-                            <div class="form-group col-md-4">
+                            <div class="form-group col-md-6">
                                 <label for="satuan">Satuan</label>
                                 <input type="text" name="satuan" id="satuan" class="form-control" required>
-                            </div>
-                            <div class="form-group col-md-4">
-                                <label for="stok">Stok</label>
-                                <input type="number" name="stok" id="stok" class="form-control" value="0"
-                                    required>
                             </div>
                         </div>
 
@@ -179,17 +176,13 @@
                         </div>
 
                         <div class="form-row">
-                            <div class="form-group col-md-4">
+                            <div class="form-group col-md-6">
                                 <label for="edit_harga">Harga</label>
                                 <input type="number" name="harga" id="edit_harga" class="form-control" required>
                             </div>
-                            <div class="form-group col-md-4">
+                            <div class="form-group col-md-6">
                                 <label for="edit_satuan">Satuan</label>
                                 <input type="text" name="satuan" id="edit_satuan" class="form-control" required>
-                            </div>
-                            <div class="form-group col-md-4">
-                                <label for="edit_stok">Stok</label>
-                                <input type="number" name="stok" id="edit_stok" class="form-control" required>
                             </div>
                         </div>
 
@@ -265,6 +258,12 @@
                     },
                     {
                         data: 'stok'
+                    },
+                    {
+                        data: 'nama_pembuat'
+                    },
+                    {
+                        data: 'nama_pengubah'
                     },
                     {
                         data: null,
@@ -407,17 +406,19 @@
             function loadPreviewIfExists(url, $imgEl) {
                 $imgEl.addClass('d-none').attr('src', '#');
                 if (!url) return;
+
+                const bustedUrl = url + (url.includes('?') ? '&' : '?') + '_=' + Date.now();
+
                 const img = new Image();
                 img.onload = function() {
-                    $imgEl.attr('src', url).removeClass('d-none');
+                    $imgEl.attr('src', bustedUrl).removeClass('d-none');
                 };
                 img.onerror = function() {
-                    // tetap sembunyikan
                     $imgEl.addClass('d-none').attr('src', '#');
                 };
-                // cache-busting little trick if perlu: img.src = url + '?_=' + Date.now();
-                img.src = url;
+                img.src = bustedUrl;
             }
+
 
             // buka modal edit: isi field + show existing foto1/2/3 as preview if exists
             $('#tabel-produk').on('click', '.btn-edit', function() {
@@ -430,7 +431,7 @@
                 $('#edit_harga').val(btn.data('harga'));
                 $('#edit_satuan').val(btn.data('satuan'));
                 $('#edit_deskripsi').val(btn.data('deskripsi'));
-                $('#edit_stok').val(btn.data('stok'));
+
 
                 // reset preview/errors
                 $('#edit_foto1_preview,#edit_foto2_preview,#edit_foto3_preview').addClass('d-none').attr(
@@ -453,7 +454,8 @@
 
                 // set action
                 // adjust route name if needed; keep same as your project
-                let url = "{{ route('master.updateproduk', ':id') }}".replace(':id', encodeURIComponent(id));
+                let url = "{{ route('master.updateproduk', ':id') }}".replace(':id', encodeURIComponent(
+                id));
                 $('#formEdit').attr('action', url);
                 $('#modalEdit').modal('show');
             });

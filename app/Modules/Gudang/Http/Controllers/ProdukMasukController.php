@@ -20,7 +20,7 @@ class ProdukMasukController
     return view('gudang::produk-masuk.index', compact('data'));
 }
 
-    public function store(Request $request)
+public function store(Request $request)
 {
     $request->validate([
         'tanggal_transaksi'     => 'required|date',
@@ -33,18 +33,8 @@ class ProdukMasukController
 
     try {
 
-        // =========================
-        // 1. GENERATE ID HEADER
-        // =========================
-       $idHeader = $this->generateId(
-            'PM',
-            'produk_masuk'
-        );
+        $idHeader = $this->generateId('PM', 'produk_masuk');
 
-
-        // =========================
-        // 2. SIMPAN HEADER
-        // =========================
         ProdukMasuk::create([
             'id'                     => $idHeader,
             'id_karyawan_gudang'     => auth('web')->id(),
@@ -54,29 +44,22 @@ class ProdukMasukController
             'tanggal_buat'           => now(),
         ]);
 
-        // =========================
-        // 3. SIMPAN DETAIL + TAMBAH STOK
-        // =========================
         foreach ($request->items as $item) {
 
-            // ambil harga produk dari master
+            // 🔥 AMBIL PRODUK MASTER
             $produk = Produk::lockForUpdate()
                 ->where('id', $item['id_produk'])
                 ->firstOrFail();
 
-            // hitung nominal (jumlah × harga)
-            $nominal = $item['jumlah'] * $produk->harga;
-
-            // simpan detail produk masuk
             DetailProdukMasuk::create([
                 'id'               => 'PMD-' . uniqid(),
                 'id_produk_masuk'  => $idHeader,
                 'id_produk'        => $item['id_produk'],
                 'jumlah'           => $item['jumlah'],
-                'satuan'           => $item['satuan'],
+                'satuan'           => $produk->satuan, // ✅ FIX DI SINI
             ]);
 
-            // 🔥 TAMBAH STOK PRODUK MASTER
+            // 🔥 TAMBAH STOK
             $produk->increment('stok', $item['jumlah']);
         }
 
@@ -89,7 +72,6 @@ class ProdukMasukController
 
     } catch (\Throwable $e) {
         DB::rollBack();
-
         return response()->json([
             'success' => false,
             'message' => $e->getMessage()
@@ -153,43 +135,48 @@ class ProdukMasukController
         }
     }
 
-    // UPDATE - Update data
-   public function update(Request $request, $id)
+public function update(Request $request, $id)
 {
     DB::beginTransaction();
     try {
 
-        // 🔥 AMBIL DATA LAMA DARI DB
+        // 1️⃣ AMBIL HEADER + DETAIL LAMA
         $header = ProdukMasuk::with('detail')->findOrFail($id);
 
-        // 1️⃣ ROLLBACK STOK LAMA (PAKAI DETAIL LAMA)
+        // 2️⃣ ROLLBACK STOK LAMA
         foreach ($header->detail as $d) {
             Produk::where('id', $d->id_produk)
                 ->decrement('stok', $d->jumlah);
         }
 
-        // 2️⃣ HAPUS DETAIL LAMA
+        // 3️⃣ HAPUS DETAIL LAMA
         DetailProdukMasuk::where('id_produk_masuk', $id)->delete();
 
-        // 3️⃣ UPDATE HEADER
+        // 4️⃣ UPDATE HEADER
         $header->update([
-            'tanggal' => $request->tanggal,
-            'keterangan' => $request->keterangan,
+            'tanggal_transaksi' => $request->tanggal_transaksi,
+            'id_update'         => auth('web')->id(),
+            'tanggal_update'    => now(),
         ]);
 
-        // 4️⃣ SIMPAN DETAIL BARU + TAMBAH STOK BARU
+        // 5️⃣ SIMPAN DETAIL BARU + TAMBAH STOK BARU
         foreach ($request->items as $item) {
 
+            // 🔥 AMBIL PRODUK MASTER
+            $produk = Produk::lockForUpdate()
+                ->where('id', $item['id_produk'])
+                ->firstOrFail();
+
             DetailProdukMasuk::create([
-                'id' => 'PMD-' . Str::random(10),
-                'id_produk_masuk' => $id,
-                'id_produk' => $item['id_produk'],
-                'jumlah' => $item['jumlah'],
-                'satuan' => $item['satuan'],
+                'id'               => 'PMD-' . Str::random(10),
+                'id_produk_masuk'  => $id,
+                'id_produk'        => $item['id_produk'],
+                'jumlah'           => $item['jumlah'],
+                'satuan'           => $produk->satuan, // ✅ dari master
             ]);
 
-            Produk::where('id', $item['id_produk'])
-                ->increment('stok', $item['jumlah']);
+            // 🔥 TAMBAH STOK BARU
+            $produk->increment('stok', $item['jumlah']);
         }
 
         DB::commit();
@@ -203,7 +190,6 @@ class ProdukMasukController
         ], 500);
     }
 }
-
 
     // DELETE - Hapus data
     public function destroy($id)

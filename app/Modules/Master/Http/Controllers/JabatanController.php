@@ -15,16 +15,28 @@ class JabatanController
         return view('master::DaftarJabatan');
     }
 
-    // data sederhana untuk DataTables (client-side)
     public function data(Request $req)
     {
-        $rows = Jabatan::all()->map(function ($r) {
-            return [
-                'id' => $r->id,
-                'nama' => $r->nama,
-                'tanggal_buat' => $r->tanggal_buat ? (string) $r->tanggal_buat : null,
-            ];
-        });
+        $rows = Jabatan::query()
+            ->leftJoin('karyawan as pembuat', 'pembuat.id', '=', 'jabatan.id_buat')
+            ->leftJoin('karyawan as pengubah', 'pengubah.id', '=', 'jabatan.id_update')
+            ->select([
+                'jabatan.id',
+                'jabatan.nama',
+                'jabatan.tanggal_buat',
+                'pembuat.nama as nama_pembuat',
+                'pengubah.nama as nama_pengubah',
+            ])
+            ->get()
+            ->map(function ($r) {
+                return [
+                    'id' => $r->id,
+                    'nama' => $r->nama,
+                    'tanggal_buat' => $r->tanggal_buat ? (string) $r->tanggal_buat : null,
+                    'nama_pembuat' => $r->nama_pembuat ?? '-',
+                    'nama_pengubah' => $r->nama_pengubah ?? '-',
+                ];
+            });
 
         return response()->json(['data' => $rows]);
     }
@@ -43,7 +55,7 @@ class JabatanController
 
         // generate id jika kosong
         $id = $req->input('id');
-        if (! $id) {
+        if (!$id) {
             $last = Jabatan::orderBy('id', 'desc')->first();
             if ($last && preg_match('/(\d+)$/', $last->id, $m)) {
                 $num = intval($m[1]) + 1;
@@ -68,7 +80,7 @@ class JabatanController
     public function updateJabatan(Request $req, $id)
     {
         $jab = Jabatan::find($id);
-        if (! $jab) {
+        if (!$jab) {
             return response()->json(['message' => 'Data tidak ditemukan.'], 404);
         }
 
@@ -93,7 +105,7 @@ class JabatanController
     public function hapusJabatan(Request $req, $id)
     {
         $jab = Jabatan::find($id);
-        if (! $jab) {
+        if (!$jab) {
             return response()->json(['message' => 'Data tidak ditemukan.'], 404);
         }
 

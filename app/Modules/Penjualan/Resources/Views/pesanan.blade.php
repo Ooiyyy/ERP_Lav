@@ -22,22 +22,22 @@
                 </ul>
             </div>
         @endif
-            <div class="table-responsive">
-                <table id="ordersTable" class="table table-striped table-bordered" style="width:100%">
-                    <thead>
-                        <tr>
-                            <th >ID Transaksi</th>
-                            <th >Tanggal Buat</th>
-                            <th >Nama Sales</th>
-                            <th >Nomor Telepon</th>
-                            <th >Nama Toko</th>
-                            <th class="text-end">Total</th>
-                            <th class="text-center">Aksi</th>
-                        </tr>
-                    </thead>
-                    <tbody></tbody>
-                </table>
-            </div>
+        <div class="table-responsive">
+            <table id="ordersTable" class="table table-striped table-bordered" style="width:100%">
+                <thead>
+                    <tr>
+                        <th>ID Transaksi</th>
+                        <th>Tanggal Buat</th>
+                        <th>Nama Sales</th>
+                        <th>Nomor Telepon</th>
+                        <th>Nama Toko</th>
+                        <th class="text-end">Total</th>
+                        <th class="text-center">Aksi</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
         <div class="mt-2" id="datatablePager"></div>
 
 
@@ -54,7 +54,7 @@
                             <div class="row g-2 mb-2">
                                 <div class="col-md-4">
                                     <label>Nama Sales</label>
-                                    <select name="id_sales" id="add_id_sales" class="form-control">
+                                    <select name="id_sales" id="add_id_sales" class="form-control" required>
                                         <option value="">-- Pilih Sales --</option>
                                         @foreach ($sales as $s)
                                             <option value="{{ $s->id }}">{{ $s->nama }}</option>
@@ -852,7 +852,7 @@
                             // set sales
                             $('#edit_id_sales').val(data.id_sales || '');
 
-                            // 🔥 PENTING: load toko BERDASARKAN sales
+                            // ? PENTING: load toko BERDASARKAN sales
                             loadTokoBySales(
                                 data.id_sales,
                                 $('#edit_id_toko'),

@@ -28,6 +28,8 @@
                                 <th>ID Supplier</th>
                                 <th>Toko</th>
                                 <th>Alamat</th>
+                                <th>Pembuat</th>
+                                <th>Pengubah</th>
                                 <th>Aksi</th>
                             </tr>
                         </thead>
@@ -40,7 +42,8 @@
     {{-- MODAL TAMBAH Toko --}}
     <div class="modal fade" id="modalTambahSupplier" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-lg">
-            <form id="formTambahSupplier" method="POST" action="{{ route('master.simpanSupplier') }}" enctype="multipart/form-data">
+            <form id="formTambahSupplier" method="POST" action="{{ route('master.simpanSupplier') }}"
+                enctype="multipart/form-data">
                 @csrf
                 <div class="modal-content">
                     <div class="modal-header">
@@ -113,8 +116,8 @@
                                 {{-- ID Supplier --}}
                                 <div class="form-group">
                                     <label for="edit_id">ID Supplier</label>
-                                    <input type="text" name="id" id="edit_id" value=""
-                                        class="form-control" maxlength="20" readonly>
+                                    <input type="text" name="id" id="edit_id" value="" class="form-control"
+                                        maxlength="20" readonly>
                                 </div>
 
                                 {{-- Nama Toko --}}
@@ -170,6 +173,12 @@
                     },
                     {
                         data: 'alamat'
+                    },
+                    {
+                        data: 'nama_pembuat'
+                    },
+                    {
+                        data: 'nama_pengubah'
                     },
                     {
                         data: null,
@@ -364,7 +373,8 @@
 
                     // kalau user klik "Ya, hapus" → eksekusi AJAX delete
                     $.ajax({
-                        url: "{{ route('master.hapusSupplier', ':id') }}".replace(':id', id),
+                        url: "{{ route('master.hapusSupplier', ':id') }}".replace(':id',
+                            id),
                         type: 'POST',
                         data: {
                             _token: '{{ csrf_token() }}',

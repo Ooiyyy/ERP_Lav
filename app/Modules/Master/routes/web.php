@@ -1,6 +1,4 @@
 <?php
-// app/Modules/Akun/routes/web.php
-
 use Illuminate\Support\Facades\Route;
 use App\Modules\Master\Http\Controllers\AkunController;
 use App\Modules\Master\Http\Controllers\TokoController;

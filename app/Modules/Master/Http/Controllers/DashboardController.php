@@ -23,12 +23,12 @@ class DashboardController
         // ambil count tiap master (gunakan count() Eloquent)
         // jika model berada di namespace lain, sesuaikan use di atas
         $counts = [
-            'jabatan'    => (int) optional(Jabatan::query())->count(),
-            'karyawan'   => (int) optional(Karyawan::query())->count(),
-            'akun'       => (int) optional(Akun::query())->count(),
-            'produk'     => (int) optional(Produk::query())->count(),
-            'pelanggan'  => (int) optional(Pelanggan::query())->count(),
-            'toko'       => (int) optional(Toko::query())->count(),
+            'jabatan' => (int) optional(Jabatan::query())->count(),
+            'karyawan' => (int) optional(Karyawan::query())->count(),
+            'akun' => (int) optional(Akun::query())->count(),
+            'produk' => (int) optional(Produk::query())->count(),
+            'pelanggan' => (int) optional(Pelanggan::query())->count(),
+            'toko' => (int) optional(Toko::query())->count(),
             'bahan_baku' => (int) optional(BahanBaku::query())->count(),
         ];
 
@@ -96,89 +96,184 @@ class DashboardController
         // jika view berada di App\Modules\Master\Resources\Views\beranda.blade.php
         return view('master::beranda', compact('cards'));
     }
+    //     public function pesananLunas(Request $r)
+//     {
+//         $from = $r->query('date_from') ?? now()->startOfMonth()->toDateString();
+//         $to = $r->query('date_to') ?? now()->endOfMonth()->toDateString();
+
+    //         // 1) total per order = sum(detail_order.jumlah * detail_order.harga)
+//         // 2) total pembayaran per order = sum(pembayaran_cash.nominal) + sum(pembayaran_va.nominal)
+//         // 3) order considered "lunas" when pembayaran_sum >= total_order
+//         // 4) group by DATE(pembayaran tanggal) -> count orders lunas per date
+
+    //         // Subquery: order_totals
+//         $orderTotals = DB::table('detail_order')
+//             ->select('id_transaksi as id_order', DB::raw('SUM(jumlah * harga) as order_total'))
+//             ->groupBy('id_transaksi');
+
+    //         // Subquery: pembayaran sums grouped by order (combine cash + va)
+//         $pembCash = DB::table('pembayaran_cash')
+//             ->select('id_order', DB::raw('SUM(nominal) as paid_cash'), DB::raw('MIN(tanggal_pembayaran) as first_paid_date'))
+//             ->whereBetween(DB::raw('DATE(tanggal_pembayaran)'), [$from, $to])
+//             ->groupBy('id_order');
+
+    //         $pembVa = DB::table('pembayaran_va')
+//             ->select('id_order', DB::raw('SUM(nominal) as paid_va'), DB::raw('MIN(tanggal_transaksi) as first_paid_date'))
+//             ->whereBetween(DB::raw('DATE(tanggal_transaksi)'), [$from, $to])
+//             ->groupBy('id_order');
+
+    //         // combine pembayaran => left join both to get total paid
+//         $paid = DB::table(DB::raw("({$pembCash->toSql()}) as pc"))
+//             ->mergeBindings($pembCash)
+//             ->leftJoin(DB::raw("({$pembVa->toSql()}) as pv"), function ($join) use ($pembVa) {
+//                 $join->on('pc.id_order', '=', 'pv.id_order');
+//             })
+//             ->select(
+//                 DB::raw('COALESCE(pc.id_order, pv.id_order) as id_order'),
+//                 DB::raw('COALESCE(pc.paid_cash,0) + COALESCE(pv.paid_va,0) as total_paid'),
+//                 DB::raw('COALESCE(pc.first_paid_date, pv.first_paid_date) as paid_date')
+//             );
+
+    //         // Note: above method using subqueries built via query builder is complex; simpler approach:
+//         // Use raw query combining payments, then group. I'll implement a simpler DB query below.
+
+    //         // Simpler approach: compute paid per order by union cash & va then group
+//         $unionPayments = DB::table('pembayaran_cash')
+//             ->select('id_order', DB::raw('nominal as nominal'), DB::raw('DATE(tanggal_pembayaran) as paid_date'))
+//             ->whereBetween(DB::raw('DATE(tanggal_pembayaran)'), [$from, $to])
+//             ->unionAll(
+//                 DB::table('pembayaran_va')
+//                     ->select('id_order', DB::raw('nominal as nominal'), DB::raw('DATE(tanggal_transaksi) as paid_date'))
+//                     ->whereBetween(DB::raw('DATE(tanggal_transaksi)'), [$from, $to])
+//             );
+
+    //         // wrap union
+//         $payments = DB::table(DB::raw("({$unionPayments->toSql()}) as union_p"))
+//             ->mergeBindings($unionPayments)
+//             ->select('id_order', DB::raw('SUM(nominal) as total_paid'), 'paid_date')
+//             ->groupBy('id_order', 'paid_date');
+
+    //         // Now join orderTotals with payments and select only those where total_paid >= order_total
+//         $result = DB::table(DB::raw("({$orderTotals->toSql()}) as ot"))
+//             ->mergeBindings($orderTotals)
+//             ->join(DB::raw("({$payments->toSql()}) as pay"), 'ot.id_order', '=', 'pay.id_order')
+//             ->mergeBindings($payments)
+//             ->select(DB::raw('pay.paid_date as date'), DB::raw('COUNT(ot.id_order) as jumlah_lunas'))
+//             ->whereRaw('pay.total_paid >= ot.order_total')
+//             ->groupBy('pay.paid_date')
+//             ->orderBy('pay.paid_date')
+//             ->get();
+
+    //         // Format response for Highcharts: arrays categories (dates) & data (counts)
+//         $dates = [];
+//         $counts = [];
+//         foreach ($result as $row) {
+//             $dates[] = $row->date;
+//             $counts[] = (int) $row->jumlah_lunas;
+//         }
+
+    //         return response()->json([
+//             'status' => 'ok',
+//             'date_from' => $from,
+//             'date_to' => $to,
+//             'categories' => $dates,
+//             'data' => $counts,
+//         ]);
+//     }
     public function pesananLunas(Request $r)
     {
-        $from = $r->query('date_from') ?? now()->startOfMonth()->toDateString();
-        $to = $r->query('date_to') ?? now()->endOfMonth()->toDateString();
+        try {
+            $from = $r->query('date_from') ?? now()->startOfMonth()->toDateString();
+            $to = $r->query('date_to') ?? now()->endOfMonth()->toDateString();
 
-        // 1) total per order = sum(detail_order.jumlah * detail_order.harga)
-        // 2) total pembayaran per order = sum(pembayaran_cash.nominal) + sum(pembayaran_va.nominal)
-        // 3) order considered "lunas" when pembayaran_sum >= total_order
-        // 4) group by DATE(pembayaran tanggal) -> count orders lunas per date
+            $fromDt = \Carbon\Carbon::parse($from)->startOfDay();
+            $toDt = \Carbon\Carbon::parse($to)->endOfDay();
 
-        // Subquery: order_totals
-        $orderTotals = DB::table('detail_order')
-            ->select('id_transaksi as id_order', DB::raw('SUM(jumlah * harga) as order_total'))
-            ->groupBy('id_transaksi');
+            // padding tanggal utk highcharts
+            $categories = [];
+            $countsByDate = [];
+            for ($d = \Carbon\Carbon::parse($from); $d->lte(\Carbon\Carbon::parse($to)); $d->addDay()) {
+                $key = $d->toDateString();
+                $categories[] = $key;
+                $countsByDate[$key] = 0;
+            }
 
-        // Subquery: pembayaran sums grouped by order (combine cash + va)
-        $pembCash = DB::table('pembayaran_cash')
-            ->select('id_order', DB::raw('SUM(nominal) as paid_cash'), DB::raw('MIN(tanggal_pembayaran) as first_paid_date'))
-            ->whereBetween(DB::raw('DATE(tanggal_pembayaran)'), [$from, $to])
-            ->groupBy('id_order');
+            // ambil order yang punya pembayaran di range (cash/va)
+            $orders = \App\Models\Order::query()
+                ->where(function ($q) use ($fromDt, $toDt) {
+                    $q->whereHas('pembayaranCash', function ($qq) use ($fromDt, $toDt) {
+                        $qq->whereBetween('tanggal_pembayaran', [$fromDt, $toDt]);
+                    })->orWhereHas('pembayaranVa', function ($qq) use ($fromDt, $toDt) {
+                        $qq->whereBetween('tanggal_transaksi', [$fromDt, $toDt]);
+                    });
+                })
+                ->with([
+                    // totalAmount() biasanya butuh detailOrders
+                    'detailOrders:id,id_transaksi,jumlah,harga',
+                    // load pembayaran agar bisa dihitung per tanggal
+                    'pembayaranCash:id,id_order,nominal,tanggal_pembayaran',
+                    'pembayaranVa:id,id_order,nominal,tanggal_transaksi',
+                ])
+                ->get();
 
-        $pembVa = DB::table('pembayaran_va')
-            ->select('id_order', DB::raw('SUM(nominal) as paid_va'), DB::raw('MIN(tanggal_transaksi) as first_paid_date'))
-            ->whereBetween(DB::raw('DATE(tanggal_transaksi)'), [$from, $to])
-            ->groupBy('id_order');
+            foreach ($orders as $order) {
+                // total order: pakai method model (ini yang “mengunci” masalah mismatch id)
+                $orderTotal = (float) $order->totalAmount();
 
-        // combine pembayaran => left join both to get total paid
-        $paid = DB::table(DB::raw("({$pembCash->toSql()}) as pc"))
-            ->mergeBindings($pembCash)
-            ->leftJoin(DB::raw("({$pembVa->toSql()}) as pv"), function ($join) use ($pembVa) {
-                $join->on('pc.id_order', '=', 'pv.id_order');
-            })
-            ->select(
-                DB::raw('COALESCE(pc.id_order, pv.id_order) as id_order'),
-                DB::raw('COALESCE(pc.paid_cash,0) + COALESCE(pv.paid_va,0) as total_paid'),
-                DB::raw('COALESCE(pc.first_paid_date, pv.first_paid_date) as paid_date')
-            );
+                // kumpulkan pembayaran dalam range => [date => sum]
+                $daily = [];
 
-        // Note: above method using subqueries built via query builder is complex; simpler approach:
-        // Use raw query combining payments, then group. I'll implement a simpler DB query below.
+                foreach ($order->pembayaranCash as $pc) {
+                    $dt = \Carbon\Carbon::parse($pc->tanggal_pembayaran);
+                    if (!$dt->between($fromDt, $toDt))
+                        continue;
 
-        // Simpler approach: compute paid per order by union cash & va then group
-        $unionPayments = DB::table('pembayaran_cash')
-            ->select('id_order', DB::raw('nominal as nominal'), DB::raw('DATE(tanggal_pembayaran) as paid_date'))
-            ->whereBetween(DB::raw('DATE(tanggal_pembayaran)'), [$from, $to])
-            ->unionAll(
-                DB::table('pembayaran_va')
-                    ->select('id_order', DB::raw('nominal as nominal'), DB::raw('DATE(tanggal_transaksi) as paid_date'))
-                    ->whereBetween(DB::raw('DATE(tanggal_transaksi)'), [$from, $to])
-            );
+                    $date = $dt->toDateString();
+                    $daily[$date] = ($daily[$date] ?? 0) + (float) $pc->nominal;
+                }
 
-        // wrap union
-        $payments = DB::table(DB::raw("({$unionPayments->toSql()}) as union_p"))
-            ->mergeBindings($unionPayments)
-            ->select('id_order', DB::raw('SUM(nominal) as total_paid'), 'paid_date')
-            ->groupBy('id_order', 'paid_date');
+                foreach ($order->pembayaranVa as $pv) {
+                    $dt = \Carbon\Carbon::parse($pv->tanggal_transaksi);
+                    if (!$dt->between($fromDt, $toDt))
+                        continue;
 
-        // Now join orderTotals with payments and select only those where total_paid >= order_total
-        $result = DB::table(DB::raw("({$orderTotals->toSql()}) as ot"))
-            ->mergeBindings($orderTotals)
-            ->join(DB::raw("({$payments->toSql()}) as pay"), 'ot.id_order', '=', 'pay.id_order')
-            ->mergeBindings($payments)
-            ->select(DB::raw('pay.paid_date as date'), DB::raw('COUNT(ot.id_order) as jumlah_lunas'))
-            ->whereRaw('pay.total_paid >= ot.order_total')
-            ->groupBy('pay.paid_date')
-            ->orderBy('pay.paid_date')
-            ->get();
+                    $date = $dt->toDateString();
+                    $daily[$date] = ($daily[$date] ?? 0) + (float) $pv->nominal;
+                }
 
-        // Format response for Highcharts: arrays categories (dates) & data (counts)
-        $dates = [];
-        $counts = [];
-        foreach ($result as $row) {
-            $dates[] = $row->date;
-            $counts[] = (int) $row->jumlah_lunas;
+                if (empty($daily))
+                    continue;
+
+                ksort($daily);
+
+                // cari tanggal pertama kali lunas (running sum)
+                $cum = 0.0;
+                foreach ($daily as $date => $sumNominal) {
+                    $cum += (float) $sumNominal;
+
+                    if ($cum + 1e-9 >= $orderTotal) {
+                        if (array_key_exists($date, $countsByDate)) {
+                            $countsByDate[$date] += 1;
+                        }
+                        break;
+                    }
+                }
+            }
+
+            return response()->json([
+                'status' => 'ok',
+                'date_from' => $from,
+                'date_to' => $to,
+                'categories' => $categories,
+                'data' => array_map('intval', array_values($countsByDate)),
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ], 500);
         }
-
-        return response()->json([
-            'status' => 'ok',
-            'date_from' => $from,
-            'date_to' => $to,
-            'categories' => $dates,
-            'data' => $counts,
-        ]);
     }
 
     /**
@@ -189,8 +284,8 @@ class DashboardController
     {
         try {
             // 1. rentang tanggal
-            $tanggal_dari   = $request->query('date_from') ?? now()->startOfMonth()->toDateString();
-            $tanggal_sampai = $request->query('date_to')   ?? now()->endOfMonth()->toDateString();
+            $tanggal_dari = $request->query('date_from') ?? now()->startOfMonth()->toDateString();
+            $tanggal_sampai = $request->query('date_to') ?? now()->endOfMonth()->toDateString();
 
             // 2. ambil nama tabel order dari model Order (agar aman jika bernama khusus)
             $modelOrder = new \App\Models\Order;
@@ -199,7 +294,7 @@ class DashboardController
 
             // 3. cek apakah kolom petugas ada di masing-masing tabel pembayaran
             $kolom_petugas_cash = null;
-            $kolom_petugas_va   = null;
+            $kolom_petugas_va = null;
 
             if (Schema::hasColumn('pembayaran_cash', 'petugas_pembayaran')) {
                 $kolom_petugas_cash = 'pc.petugas_pembayaran';
@@ -219,7 +314,7 @@ class DashboardController
 
             // 4. siapkan select petugas untuk masing-masing (NULL jika kolom tidak ada)
             $select_petugas_cash = $kolom_petugas_cash ? DB::raw("$kolom_petugas_cash as petugas") : DB::raw("NULL as petugas");
-            $select_petugas_va   = $kolom_petugas_va   ? DB::raw("$kolom_petugas_va as petugas")   : DB::raw("NULL as petugas");
+            $select_petugas_va = $kolom_petugas_va ? DB::raw("$kolom_petugas_va as petugas") : DB::raw("NULL as petugas");
 
             // 5. query pembayaran_cash (id_order, nominal, petugas?/NULL)
             $query_cash = DB::table('pembayaran_cash as pc')

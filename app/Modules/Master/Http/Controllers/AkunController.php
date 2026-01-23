@@ -31,26 +31,40 @@ class AkunController
     }
 
 
-    /**
-     * Return JSON data for DataTable (client-side).
-     * status_akun berasal dari karyawan.status (Y/N).
-     */
+
     public function data()
     {
-        $rows = Akun::with('karyawan')->get();
-        $data = $rows->map(function ($r) {
-            return [
-                'id_karyawan'   => $r->id_karyawan,
-                'username'      => $r->username,
-                'password'      => $r->password,
-                'status_login'  => $r->status_login,                  // 1 atau 2
-                'status_akun'   => optional($r->karyawan)->status ?? 'N', // Y/N dari karyawan
-                'tanggal_buat'  => $r->tanggal_buat ? (string) $r->tanggal_buat : null,
-            ];
-        });
+        $rows = Akun::query()
+            ->leftJoin('karyawan', 'karyawan.id', '=', 'akun.id_karyawan')
+            ->leftJoin('karyawan as pembuat', 'pembuat.id', '=', 'akun.id_buat')
+            ->leftJoin('karyawan as pengubah', 'pengubah.id', '=', 'akun.id_update')
+            ->select([
+                'akun.id_karyawan',
+                'akun.username',
+                'akun.password',
+                'akun.status_login',
+                'akun.tanggal_buat',
+                'karyawan.status as status_akun',
+                'pembuat.nama as nama_pembuat',
+                'pengubah.nama as nama_pengubah',
+            ])
+            ->get()
+            ->map(function ($r) {
+                return [
+                    'id_karyawan' => $r->id_karyawan,
+                    'username' => $r->username,
+                    'password' => $r->password,
+                    'status_login' => $r->status_login,
+                    'status_akun' => $r->status_akun ?? 'N',
+                    'tanggal_buat' => $r->tanggal_buat ? (string) $r->tanggal_buat : null,
+                    'nama_pembuat' => $r->nama_pembuat ?? '-',
+                    'nama_pengubah' => $r->nama_pengubah ?? '-',
+                ];
+            });
 
-        return response()->json(['data' => $data]);
+        return response()->json(['data' => $rows]);
     }
+
 
     public function karyawanTanpaAkun()
     {
@@ -65,9 +79,9 @@ class AkunController
 
         $data = $karyawanTanpaAkun->map(function ($kta) {
             return [
-                'id_karyawan'   => $kta->id,
-                'nama'          => $kta->nama,
-                'jabatan'       => $kta->jabatan,
+                'id_karyawan' => $kta->id,
+                'nama' => $kta->nama,
+                'jabatan' => $kta->jabatan,
             ];
         });
         return response()->json(['data' => $data]);
@@ -80,9 +94,9 @@ class AkunController
     public function simpanAkun(Request $req)
     {
         $v = Validator::make($req->all(), [
-            'id_karyawan'  => 'required|string|exists:karyawan,id',
-            'username'     => 'required|string|max:100|unique:akun,username',
-            'password'     => 'required|string|min:6',
+            'id_karyawan' => 'required|string|exists:karyawan,id',
+            'username' => 'required|string|max:100|unique:akun,username',
+            'password' => 'required|string|min:6',
             'status_login' => 'nullable|in:1,2',
         ]);
 
@@ -93,13 +107,12 @@ class AkunController
         $statusLogin = ($karyawan->id_jabatan === '003') ? '2' : '1';
 
         $akun = Akun::create([
-            'id_karyawan'    => $req->id_karyawan,
-            'username'       => $req->username,
-            'password'       => Hash::make($req->password),
-            'status_login'   => $statusLogin,
-            'id_buat'        => auth('web')->id(),
-            'tanggal_buat'   => now(),
-            'tanggal_update' => now(),
+            'id_karyawan' => $req->id_karyawan,
+            'username' => $req->username,
+            'password' => Hash::make($req->password),
+            'status_login' => $statusLogin,
+            'id_buat' => auth('web')->id(),
+            'tanggal_buat' => now(),
         ]);
 
         // NOTE: status karyawan (Y/N) tetap di tabel karyawan; tidak kita ubah di sini
@@ -112,13 +125,13 @@ class AkunController
     public function updateAkun(Request $req, $id)
     {
         $akun = Akun::find($id);
-        if (! $akun) {
+        if (!$akun) {
             return response()->json(['message' => 'Akun tidak ditemukan.'], 404);
         }
 
         $v = Validator::make($req->all(), [
-            'username'     => 'required|string|max:100|unique:akun,username,' . $akun->id_karyawan . ',id_karyawan',
-            'password'     => 'nullable|string|min:6',
+            'username' => 'required|string|max:100|unique:akun,username,' . $akun->id_karyawan . ',id_karyawan',
+            'password' => 'nullable|string|min:6',
         ]);
 
         if ($v->fails()) {
@@ -126,8 +139,8 @@ class AkunController
         }
 
         $data = [
-            'username'       => $req->username,
-            'id_update'      => auth('web')->id(),
+            'username' => $req->username,
+            'id_update' => auth('web')->id(),
             'tanggal_update' => now(),
         ];
 
@@ -147,7 +160,7 @@ class AkunController
     public function toggleStatus(Request $req, $id)
     {
         $karyawan = Karyawan::find($id);
-        if (! $karyawan) {
+        if (!$karyawan) {
             return response()->json(['message' => 'Karyawan tidak ditemukan.'], 404);
         }
 
@@ -182,7 +195,7 @@ class AkunController
     public function hapusAkun(Request $req, $id)
     {
         $akun = Akun::find($id);
-        if (! $akun) {
+        if (!$akun) {
             return response()->json(['message' => 'Akun tidak ditemukan.'], 404);
         }
 
